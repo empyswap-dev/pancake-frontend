@@ -1,24 +1,31 @@
+import { SUPPORTED_CHAIN_IDS as IFO_SUPPORTED_CHAINS } from '@pancakeswap/ifos'
 import { ContextApi } from '@pancakeswap/localization'
 import { SUPPORTED_CHAIN_IDS as POOL_SUPPORTED_CHAINS } from '@pancakeswap/pools'
+import { SUPPORTED_CHAIN_IDS as POSITION_MANAGERS_SUPPORTED_CHAINS } from '@pancakeswap/position-managers'
+import { SUPPORTED_CHAIN_IDS as PREDICTION_SUPPORTED_CHAINS } from '@pancakeswap/prediction'
 import {
-  BirthdayIcon,
-  DropdownMenuItemType,
   DropdownMenuItems,
+  DropdownMenuItemType,
   EarnFillIcon,
   EarnIcon,
   MenuItemsType,
   MoreIcon,
+  NftFillIcon,
+  NftIcon,
   PancakeProtectorIcon,
+  ShoppingBasketFilledIcon,
+  ShoppingBasketIcon,
   SwapFillIcon,
   SwapIcon,
 } from '@pancakeswap/uikit'
 import {
   FIXED_STAKING_SUPPORTED_CHAINS,
   LIQUID_STAKING_SUPPORTED_CHAINS,
-  SUPPORT_BUY_CRYPTO,
+  SUPPORT_CAKE_STAKING,
   SUPPORT_FARMS,
   SUPPORT_ONLY_BSC,
 } from 'config/constants/supportChains'
+import { getOptionsUrl } from 'utils/getOptionsUrl'
 import { getPerpetualUrl } from 'utils/getPerpetualUrl'
 import { nftsBaseUrl } from 'views/Nft/market/constants'
 
@@ -60,7 +67,7 @@ const config: (
         },
         {
           label: t('Liquidity'),
-          href: '/liquidity',
+          href: '/liquidity/positions',
         },
         {
           label: t('Perpetual'),
@@ -69,7 +76,13 @@ const config: (
             languageCode,
             isDark,
           }),
-          confirmModalId: 'usCitizenConfirmModal',
+          confirmModalId: 'perpConfirmModal',
+          type: DropdownMenuItemType.EXTERNAL_LINK,
+        },
+        {
+          label: t('Options'),
+          href: getOptionsUrl(),
+          confirmModalId: 'optionsConfirmModal',
           type: DropdownMenuItemType.EXTERNAL_LINK,
         },
         {
@@ -78,15 +91,10 @@ const config: (
           type: DropdownMenuItemType.EXTERNAL_LINK,
         },
         {
-          label: `${t('Limit')} (V2)`,
+          label: `${t('Limit')} (Deprecated)`,
           href: '/limit-orders',
           supportChainIds: SUPPORT_ONLY_BSC,
           image: '/images/decorations/3d-coin.png',
-        },
-        {
-          label: t('Buy Crypto'),
-          href: '/buy-crypto',
-          supportChainIds: SUPPORT_BUY_CRYPTO,
         },
         {
           label: t('Trading Reward'),
@@ -96,8 +104,16 @@ const config: (
       ].map((item) => addMenuItemSupported(item, chainId)),
     },
     {
+      label: t('Buy'),
+      href: '/buy-crypto',
+      icon: ShoppingBasketIcon,
+      fillIcon: ShoppingBasketFilledIcon,
+      showItemsOnMobile: false,
+      items: [],
+    },
+    {
       label: t('Earn'),
-      href: '/farms',
+      href: '/liquidity/pools',
       icon: EarnIcon,
       fillIcon: EarnFillIcon,
       image: '/images/decorations/pe2.png',
@@ -105,13 +121,23 @@ const config: (
       items: [
         {
           label: t('Farms'),
-          href: '/farms',
+          href: '/liquidity/pools',
           supportChainIds: SUPPORT_FARMS,
         },
         {
-          label: t('Pools'),
+          label: t('CAKE Staking'),
+          href: '/cake-staking',
+          supportChainIds: SUPPORT_CAKE_STAKING,
+        },
+        {
+          label: t('Syrup Pools'),
           href: '/pools',
           supportChainIds: POOL_SUPPORTED_CHAINS,
+        },
+        {
+          label: t('Position Manager'),
+          href: '/position-managers',
+          supportChainIds: POSITION_MANAGERS_SUPPORTED_CHAINS,
         },
         {
           label: t('Liquid Staking'),
@@ -129,12 +155,18 @@ const config: (
       label: t('Game'),
       icon: PancakeProtectorIcon,
       hideSubNav: true,
-      href: 'https://protectors.pancakeswap.finance',
+      href: 'https://pancakeswap.games/',
       items: [
+        {
+          label: t('Gaming Marketplace'),
+          href: 'https://pancakeswap.games/',
+          type: DropdownMenuItemType.EXTERNAL_LINK,
+        },
         {
           label: t('Prediction (BETA)'),
           href: '/prediction',
           image: '/images/decorations/prediction.png',
+          supportChainIds: PREDICTION_SUPPORTED_CHAINS,
         },
         {
           label: t('Lottery'),
@@ -142,64 +174,45 @@ const config: (
           image: '/images/decorations/lottery.png',
         },
         {
+          label: t('Quests'),
+          href: 'https://quest.pancakeswap.finance/quests',
+          status: { text: t('New'), color: 'success' },
+          type: DropdownMenuItemType.EXTERNAL_LINK,
+        },
+        {
           label: t('Pottery (BETA)'),
           href: '/pottery',
           image: '/images/decorations/lottery.png',
         },
+      ].map((item) => addMenuItemSupported(item, chainId)),
+    },
+    {
+      label: t('NFT'),
+      href: `${nftsBaseUrl}`,
+      icon: NftIcon,
+      fillIcon: NftFillIcon,
+      supportChainIds: SUPPORT_ONLY_BSC,
+      image: '/images/decorations/nft.png',
+      items: [
         {
-          label: t('Pancake Protectors'),
-          href: 'https://protectors.pancakeswap.finance',
-          type: DropdownMenuItemType.EXTERNAL_LINK,
+          label: t('Overview'),
+          href: `${nftsBaseUrl}`,
+        },
+        {
+          label: t('Collections'),
+          href: `${nftsBaseUrl}/collections`,
+        },
+        {
+          label: t('Activity'),
+          href: `${nftsBaseUrl}/activity`,
         },
       ],
     },
     {
-      label: t('Birthday'),
-      icon: BirthdayIcon,
-      hideSubNav: true,
-      items: [
-        {
-          label: t('Uranus Communities'),
-          href: 'https://blog.pancakeswap.finance/articles/pancake-swap-s-de-fi-galaxy-tour-planet-1-uranus-communities-unite-with-your-local-de-fi-heroes',
-          type: DropdownMenuItemType.EXTERNAL_LINK,
-        },
-        {
-          label: t('Mercury Mysteries'),
-          href: 'https://blog.pancakeswap.finance/articles/pancake-swap-s-de-fi-galaxy-tour-planet-2-mercury-mysteries-the-enigma-of-multichain-swaps',
-          type: DropdownMenuItemType.EXTERNAL_LINK,
-        },
-        {
-          label: t('Venus Protectors'),
-          href: 'https://blog.pancakeswap.finance/articles/pancake-swap-s-de-fi-galaxy-tour-planet-3-venus-protector-pancake-protectors-birthday-nft',
-          type: DropdownMenuItemType.EXTERNAL_LINK,
-        },
-        {
-          label: t('Uranus Unity Rain'),
-          href: 'https://blog.pancakeswap.finance/articles/pancake-swap-s-de-fi-galaxy-tour-planet-1-uranus-unity-rain-showering-cake-rewards-on-telegram',
-          type: DropdownMenuItemType.EXTERNAL_LINK,
-        },
-        {
-          label: t('Mars Lottery Paradise'),
-          href: 'https://blog.pancakeswap.finance/articles/pancake-swap-s-de-fi-galaxy-tour-planet-4-mars-mystique-lottery-paradise',
-          type: DropdownMenuItemType.EXTERNAL_LINK,
-        },
-        {
-          label: t('Jupiter Predictors'),
-          href: 'https://blog.pancakeswap.finance/articles/pancake-swap-s-de-fi-galaxy-tour-planet-5-jupiter-predictors-predicting-crypto-movements',
-          type: DropdownMenuItemType.EXTERNAL_LINK,
-        },
-        {
-          label: t('Saturn Syndicate'),
-          href: 'https://blog.pancakeswap.finance/articles/pancake-swap-s-de-fi-galaxy-tour-planet-6-saturn-syndicate-perpetual-trading-galore',
-          type: DropdownMenuItemType.EXTERNAL_LINK,
-        },
-        {
-          label: t('Uranus Memories'),
-          href: 'https://blog.pancakeswap.finance/articles/pancake-swap-s-de-fi-galaxy-tour-uranus-memories-share-your-favorite-memory-and-product-on-pancake-swap',
-          status: { text: t('New'), color: 'success' },
-          type: DropdownMenuItemType.EXTERNAL_LINK,
-        },
-      ],
+      label: t('v4'),
+      href: '/v4',
+      showOnMobile: false,
+      items: [],
     },
     {
       label: '',
@@ -214,14 +227,7 @@ const config: (
         {
           label: t('IFO'),
           href: '/ifo',
-          supportChainIds: SUPPORT_ONLY_BSC,
           image: '/images/ifos/ifo-bunny.png',
-        },
-        {
-          label: t('NFT'),
-          href: `${nftsBaseUrl}`,
-          supportChainIds: SUPPORT_ONLY_BSC,
-          image: '/images/decorations/nft.png',
         },
         {
           label: t('Affiliate Program'),
@@ -254,6 +260,11 @@ const config: (
           label: t('Docs'),
           href: 'https://docs.pancakeswap.finance',
           type: DropdownMenuItemType.EXTERNAL_LINK,
+        },
+        {
+          label: t('v4'),
+          href: '/v4',
+          isMobileOnly: true,
         },
       ].map((item) => addMenuItemSupported(item, chainId)),
     },

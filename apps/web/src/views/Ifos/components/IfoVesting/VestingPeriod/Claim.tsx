@@ -1,13 +1,15 @@
+import { PoolIds } from '@pancakeswap/ifos'
 import { useTranslation } from '@pancakeswap/localization'
 import { AutoRenewIcon, Button, useToast } from '@pancakeswap/uikit'
 import { useWeb3React } from '@pancakeswap/wagmi'
-import { Address } from 'wagmi'
 import { ToastDescriptionWithTx } from 'components/Toast'
-import { PoolIds } from 'config/constants/types'
 import useCatchTxError from 'hooks/useCatchTxError'
 import { useIfoV3Contract } from 'hooks/useContract'
 import { useCallback, useMemo } from 'react'
+import { Address } from 'viem'
 import { VestingData } from 'views/Ifos/hooks/vesting/fetchUserWalletIfoData'
+
+import { SwitchNetworkTips } from '../../IfoFoldableCard/IfoPoolCard/SwitchNetworkTips'
 
 interface Props {
   poolId: PoolIds
@@ -27,7 +29,7 @@ const ClaimButton: React.FC<React.PropsWithChildren<Props>> = ({
   const { account, chain } = useWeb3React()
   const { t } = useTranslation()
   const { toastSuccess } = useToast()
-  const { address, token } = data.ifo
+  const { address, token, chainId } = data.ifo
   const contract = useIfoV3Contract(address)
   const { fetchWithCatchTxError, loading: isPending } = useCatchTxError()
 
@@ -38,10 +40,18 @@ const ClaimButton: React.FC<React.PropsWithChildren<Props>> = ({
 
   const handleClaim = useCallback(async () => {
     const { vestingId } = data.userVestingData[poolId]
+
+    if (!account) return
+
     const methods = isVestingInitialized
-      ? contract.write.release([vestingId as Address], { account, chain })
-      : contract.write.harvestPool([poolId === PoolIds.poolBasic ? 0 : 1], { account, chain })
-    const receipt = await fetchWithCatchTxError(() => methods)
+      ? contract?.write.release([vestingId as Address], { account, chain })
+      : contract?.write.harvestPool([poolId === PoolIds.poolBasic ? 0 : 1], { account, chain })
+    const receipt = await fetchWithCatchTxError(() => {
+      if (methods) {
+        return methods
+      }
+      throw new Error('Invalid contract call')
+    })
 
     if (receipt?.status) {
       toastSuccess(
@@ -56,7 +66,7 @@ const ClaimButton: React.FC<React.PropsWithChildren<Props>> = ({
     data.userVestingData,
     poolId,
     isVestingInitialized,
-    contract.write,
+    contract?.write,
     account,
     chain,
     fetchWithCatchTxError,
@@ -64,6 +74,10 @@ const ClaimButton: React.FC<React.PropsWithChildren<Props>> = ({
     t,
     fetchUserVestingData,
   ])
+
+  if (chain?.id !== chainId) {
+    return <SwitchNetworkTips ifoChainId={chainId} />
+  }
 
   return (
     <Button

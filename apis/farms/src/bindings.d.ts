@@ -13,4 +13,8 @@ declare global {
   const ARBITRUM_ONE_NODE: string
   const LINEA_NODE: string
   const BASE_NODE: string
+  const OPBNB_NODE: string
+  const OPBNB_TESTNET_NODE: string
+  const EXPLORER_URL: string
+  const EXPLORER_API_KEY: string
 }

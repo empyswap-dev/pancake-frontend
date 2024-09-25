@@ -1,11 +1,9 @@
 import { useTranslation } from '@pancakeswap/localization'
 import { Flex, Text, useMatchBreakpoints } from '@pancakeswap/uikit'
+import { useQuery } from '@tanstack/react-query'
+import { ASSET_CDN } from 'config/constants/endpoints'
 import Image from 'next/legacy/image'
 import { styled } from 'styled-components'
-import useSWRImmutable from 'swr/immutable'
-import aptosBallRocket from '../../images/aptos-ball-rocket.png'
-import bnbBallRocket from '../../images/bnb-ball-rocket.png'
-import ethBallRocket from '../../images/eth-ball-rocket.png'
 import { ChainTags } from './ChainTags'
 import { MetricsCard } from './MetricsCard'
 
@@ -52,9 +50,18 @@ const AptosBallRocket = styled.div`
 
 const Stats = () => {
   const { t } = useTranslation()
-  const { data: tvl } = useSWRImmutable('tvl')
-  const { data: txCount } = useSWRImmutable('totalTx30Days')
-  const { data: addressCount } = useSWRImmutable('addressCount30Days')
+  const { data: tvl = 0 } = useQuery<number>({
+    queryKey: ['tvl'],
+    enabled: false,
+  })
+  const { data: txCount = 0 } = useQuery<number>({
+    queryKey: ['totalTx30Days'],
+    enabled: false,
+  })
+  const { data: addressCount = 0 } = useQuery<number>({
+    queryKey: ['addressCount30Days'],
+    enabled: false,
+  })
   const { isMobile, isSm, isMd, isXxl } = useMatchBreakpoints()
 
   return (
@@ -87,29 +94,35 @@ const Stats = () => {
           description={t('in the last 30 days')}
         />
         <MetricsCard title={t('Total Trades:')} value={txCount} description={t('in the last 30 days')} />
-        <MetricsCard title={t('Total Value Locked:')} value={tvl} description={t('in the last 30 days')} prefix="$" />
+        <MetricsCard title={t('Total Value Locked:')} value={tvl} description="" prefix="$" />
       </Flex>
       <ChainTags />
       <ImageLayer>
         <BnbBallRocket>
-          <Image src={bnbBallRocket} alt="bnbBallRocket" width={144} height={168} placeholder="blur" />
+          <Image
+            src={`${ASSET_CDN}/web/landing/bnb-ball-rocket.png`}
+            alt="bnbBallRocket"
+            width={144}
+            height={168}
+            unoptimized
+          />
         </BnbBallRocket>
         <EthBallRocket>
           <Image
-            src={ethBallRocket}
+            src={`${ASSET_CDN}/web/landing/eth-ball-rocket.png`}
             alt="ethBallRocket"
             width={isXxl ? 116 : 70}
             height={isXxl ? 230 : 140}
-            placeholder="blur"
+            unoptimized
           />
         </EthBallRocket>
         <AptosBallRocket>
           <Image
-            src={aptosBallRocket}
+            src={`${ASSET_CDN}/web/landing/aptos-ball-rocket.png`}
             alt="aptosBallRocket"
             width={isXxl ? 84 : 53}
             height={isXxl ? 101 : 64}
-            placeholder="blur"
+            unoptimized
           />
         </AptosBallRocket>
       </ImageLayer>

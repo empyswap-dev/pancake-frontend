@@ -1,12 +1,14 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
+import BundleAnalyzer from '@next/bundle-analyzer'
+import { withWebSecurityHeaders } from '@pancakeswap/next-config/withWebSecurityHeaders'
+import smartRouterPkgs from '@pancakeswap/smart-router/package.json' with { type: 'json' }
 import { withSentryConfig } from '@sentry/nextjs'
-import { withAxiom } from 'next-axiom'
+import { createVanillaExtractPlugin } from '@vanilla-extract/next-plugin'
+import vercelToolbarPlugin from '@vercel/toolbar/plugins/next'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import BundleAnalyzer from '@next/bundle-analyzer'
-import { createVanillaExtractPlugin } from '@vanilla-extract/next-plugin'
-import smartRouterPkgs from '@pancakeswap/smart-router/package.json' assert { type: 'json' }
-import { withWebSecurityHeaders } from '@pancakeswap/next-config/withWebSecurityHeaders'
+
+const withVercelToolbar = vercelToolbarPlugin()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -42,27 +44,34 @@ const workerDeps = Object.keys(smartRouterPkgs.dependencies)
 /** @type {import('next').NextConfig} */
 const config = {
   typescript: {
-    tsconfigPath: 'tsconfig.build.json',
+    tsconfigPath: 'tsconfig.json',
   },
   compiler: {
     styledComponents: true,
   },
   experimental: {
     scrollRestoration: true,
+    fallbackNodePolyfills: false,
     outputFileTracingRoot: path.join(__dirname, '../../'),
     outputFileTracingExcludes: {
-      '*': ['**@swc+core*', '**/@esbuild**'],
+      '*': [],
     },
+    optimizePackageImports: ['@pancakeswap/widgets-internal', '@pancakeswap/uikit'],
   },
   transpilePackages: [
     '@pancakeswap/farms',
+    '@pancakeswap/position-managers',
     '@pancakeswap/localization',
     '@pancakeswap/hooks',
     '@pancakeswap/utils',
     '@pancakeswap/widgets-internal',
+    '@pancakeswap/ifos',
+    '@pancakeswap/uikit',
+    // https://github.com/TanStack/query/issues/6560#issuecomment-1975771676
+    '@tanstack/query-core',
   ],
   reactStrictMode: true,
-  swcMinify: true,
+  swcMinify: false,
   images: {
     contentDispositionType: 'attachment',
     remotePatterns: [
@@ -70,6 +79,11 @@ const config = {
         protocol: 'https',
         hostname: 'static-nft.pancakeswap.com',
         pathname: '/mainnet/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'assets.pancakeswap.finance',
+        pathname: '/web/**',
       },
     ],
   },
@@ -82,6 +96,10 @@ const config = {
       {
         source: '/info/pool/:address',
         destination: '/info/pools/:address',
+      },
+      {
+        source: '/.well-known/vercel/flags',
+        destination: '/api/vercel/flags',
       },
     ]
   },
@@ -130,11 +148,6 @@ const config = {
       {
         source: '/send',
         destination: '/swap',
-        permanent: true,
-      },
-      {
-        source: '/swap/:outputCurrency',
-        destination: '/swap?outputCurrency=:outputCurrency',
         permanent: true,
       },
       {
@@ -216,6 +229,6 @@ const config = {
   },
 }
 
-export default withBundleAnalyzer(
-  withVanillaExtract(withSentryConfig(withAxiom(withWebSecurityHeaders(config)), sentryWebpackPluginOptions)),
+export default withVercelToolbar(
+  withBundleAnalyzer(withVanillaExtract(withSentryConfig(withWebSecurityHeaders(config)), sentryWebpackPluginOptions)),
 )

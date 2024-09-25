@@ -1,23 +1,24 @@
+import { Ifo, PoolIds } from '@pancakeswap/ifos'
 import { ContextApi, useTranslation } from '@pancakeswap/localization'
 import {
   Box,
   Card,
   CardBody,
+  CardFooter,
   CardHeader,
+  ExpandableLabel,
   Flex,
   HelpIcon,
   Text,
   useTooltip,
-  ExpandableLabel,
-  CardFooter,
 } from '@pancakeswap/uikit'
-import { useAccount } from 'wagmi'
-import { Ifo, PoolIds } from 'config/constants/types'
 import { useMemo, useState } from 'react'
 import { useProfile } from 'state/profile/hooks'
 import { styled } from 'styled-components'
 import useCriterias from 'views/Ifos/hooks/v3/useCriterias'
 import { PublicIfoData, WalletIfoData } from 'views/Ifos/types'
+import { useAccount } from 'wagmi'
+import { isBasicSale } from '../../../hooks/v7/helpers'
 import { CardConfigReturn, EnableStatus } from '../types'
 import IfoCardActions from './IfoCardActions'
 import IfoCardDetails from './IfoCardDetails'
@@ -53,11 +54,14 @@ export const cardConfig = (
     version: number
     needQualifiedPoints?: boolean
     needQualifiedNFT?: boolean
+    saleType?: number
+    additionalClaimingFee?: boolean
   },
 ): CardConfigReturn => {
   switch (poolId) {
     case PoolIds.poolBasic:
-      if (meta?.version >= 3.1) {
+      // Sale type 2 is basic sale
+      if (meta?.version >= 3.1 && !isBasicSale(meta?.saleType)) {
         const MSG_MAP = {
           needQualifiedNFT: t('Set PancakeSquad NFT as Pancake Profile avatar.'),
           needQualifiedPoints: t('Reach a certain Pancake Profile Points threshold.'),
@@ -84,7 +88,9 @@ export const cardConfig = (
                 </Text>
               ))}
             </>
-          ) : null,
+          ) : (
+            <></>
+          ),
         }
       }
 
@@ -99,7 +105,9 @@ export const cardConfig = (
       return {
         title: meta?.version >= 3.1 ? t('Public Sale') : t('Unlimited Sale'),
         variant: 'violet',
-        tooltip: t('No limits on the amount you can commit. Additional fee applies when claiming.'),
+        tooltip: meta.additionalClaimingFee
+          ? t('No limits on the amount you can commit. Additional fee applies when claiming.')
+          : t('No limits on the amount you can commit.'),
       }
 
     default:
@@ -118,27 +126,32 @@ const SmallCard: React.FC<React.PropsWithChildren<IfoCardProps>> = ({
   const { t } = useTranslation()
   const { address: account } = useAccount()
 
-  const { admissionProfile, pointThreshold, vestingInformation } = publicIfoData[poolId]
+  const admissionProfile = publicIfoData[poolId]?.admissionProfile
+  const pointThreshold = publicIfoData[poolId]?.pointThreshold
+  const vestingInformation = publicIfoData[poolId]?.vestingInformation
+  const saleType = publicIfoData[poolId]?.saleType
 
   const { needQualifiedNFT, needQualifiedPoints } = useMemo(() => {
-    return ifo.version >= 3.1 && poolId === PoolIds.poolBasic
+    return ifo.version >= 3.1 && poolId === PoolIds.poolBasic && !isBasicSale(saleType)
       ? {
           needQualifiedNFT: Boolean(admissionProfile),
           needQualifiedPoints: pointThreshold ? pointThreshold > 0 : false,
         }
       : {}
-  }, [ifo.version, admissionProfile, pointThreshold, poolId])
+  }, [ifo.version, admissionProfile, pointThreshold, poolId, saleType])
 
   const config = cardConfig(t, poolId, {
     version: ifo.version,
     needQualifiedNFT,
     needQualifiedPoints,
+    saleType,
+    additionalClaimingFee: ifo[poolId]?.additionalClaimingFee,
   })
 
   const { hasActiveProfile, isLoading: isProfileLoading } = useProfile()
   const { targetRef, tooltip, tooltipVisible } = useTooltip(config.tooltip, { placement: 'bottom' })
 
-  const isLoading = isProfileLoading || publicIfoData.status === 'idle'
+  const isLoading = Boolean(isProfileLoading && needQualifiedNFT) || publicIfoData.status === 'idle'
 
   const { isEligible, criterias } = useCriterias(walletIfoData[poolId], {
     needQualifiedNFT,
@@ -149,15 +162,20 @@ const SmallCard: React.FC<React.PropsWithChildren<IfoCardProps>> = ({
     return (
       account &&
       ifo.version >= 3.2 &&
+      vestingInformation?.percentage &&
       vestingInformation.percentage > 0 &&
       publicIfoData.status === 'finished' &&
-      walletIfoData[poolId].amountTokenCommittedInLP.gt(0)
+      walletIfoData[poolId]?.amountTokenCommittedInLP.gt(0)
     )
   }, [account, ifo, poolId, publicIfoData, vestingInformation, walletIfoData])
 
   const cardTitle = ifo.cIFO ? `${config.title} (cIFO)` : config.title
 
   const [isExpanded, setIsExpanded] = useState(false)
+
+  if (!isLoading && !publicIfoData[poolId]?.distributionRatio) {
+    return null
+  }
 
   return (
     <>

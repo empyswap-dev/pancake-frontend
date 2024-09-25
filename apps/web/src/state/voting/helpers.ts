@@ -37,7 +37,7 @@ export const getProposal = async (id: string): Promise<Proposal> => {
   const response: { proposal: Proposal } = await request(
     SNAPSHOT_API,
     gql`
-      query getProposal($id: String) {
+      query getProposal($id: String!) {
         proposal(id: $id) {
           id
           title
@@ -49,6 +49,7 @@ export const getProposal = async (id: string): Promise<Proposal> => {
           state
           author
           votes
+          ipfs
         }
       }
     `,
@@ -71,6 +72,7 @@ export const getVotes = async (first: number, skip: number, where: VoteWhere): P
             choices
           }
           vp
+          ipfs
         }
       }
     `,

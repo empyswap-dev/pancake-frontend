@@ -1,22 +1,23 @@
 import { ChainId } from '@pancakeswap/chains'
-import { FetchStatus } from 'config/constants/types'
-import dayjs, { ManipulateType } from 'dayjs'
 import { GraphQLClient } from 'graphql-request'
 import { useMemo } from 'react'
+import { multiChainId } from 'state/info/constant'
 import { useChainNameByQuery } from 'state/info/hooks'
-import { multiChainName, multiChainId } from 'state/info/constant'
 import { Block } from 'state/info/types'
-import useSWRImmutable from 'swr/immutable'
-import { getDeltaTimestamps } from 'utils/getDeltaTimestamps'
-import { v3InfoClients, v3Clients } from 'utils/graphql'
-import { useBlockFromTimeStampSWR } from 'views/Info/hooks/useBlocksFromTimestamps'
 import { getChainName } from 'state/info/utils'
+import { getDeltaTimestamps } from 'utils/getDeltaTimestamps'
+import { v3InfoClients } from 'utils/graphql'
+import { useBlocksFromTimestamps } from 'views/Info/hooks/useBlocksFromTimestamps'
 
-import { SUBGRAPH_START_BLOCK, DURATION_INTERVAL } from '../constants'
+import { useQuery } from '@tanstack/react-query'
+import { chainIdToExplorerInfoChainName, explorerApiClient } from 'state/info/api/client'
+import { useExplorerChainNameByQuery } from 'state/info/api/hooks'
+import { components } from 'state/info/api/schema'
+import { getPercentChange } from 'views/V3Info/utils/data'
+import { SUBGRAPH_START_BLOCK } from '../constants'
 import { fetchPoolChartData } from '../data/pool/chartData'
-import { fetchPoolDatas } from '../data/pool/poolData'
+import { fetchedPoolData } from '../data/pool/poolData'
 import { PoolTickData, fetchTicksSurroundingPrice } from '../data/pool/tickData'
-import { fetchTopPoolAddresses } from '../data/pool/topPools'
 import { fetchPoolTransactions } from '../data/pool/transactions'
 import { fetchChartData } from '../data/protocol/chart'
 import { fetchProtocolData } from '../data/protocol/overview'
@@ -25,8 +26,7 @@ import { fetchSearchResults } from '../data/search'
 import { fetchTokenChartData } from '../data/token/chartData'
 import { fetchPoolsForToken } from '../data/token/poolsForToken'
 import { fetchPairPriceChartTokenData, fetchTokenPriceData } from '../data/token/priceData'
-import { fetchedTokenDatas } from '../data/token/tokenData'
-import { fetchTopTokenAddresses } from '../data/token/topTokens'
+import { fetchedTokenData, fetchedTokenDatas } from '../data/token/tokenData'
 import { fetchTokenTransactions } from '../data/token/transactions'
 import {
   ChartDayData,
@@ -38,107 +38,81 @@ import {
   TokenData,
   Transaction,
 } from '../types'
+import { transformPoolData } from '../utils'
 
-const SWR_SETTINGS_WITHOUT_REFETCH = {
-  errorRetryCount: 3,
-  errorRetryInterval: 3000,
+const QUERY_SETTINGS_IMMUTABLE = {
+  retry: 3,
+  retryDelay: 3000,
   keepPreviousData: true,
+  refetchOnMount: false,
+  refetchOnReconnect: false,
+  refetchOnWindowFocus: false,
 }
 
 export const useProtocolChartData = (): ChartDayData[] | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
-  const { data: chartData } = useSWRImmutable(
-    chainId && [`v3/info/protocol/ProtocolChartData/${chainId}`, chainId],
-    () => fetchChartData(v3InfoClients[chainId]),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const explorerChainName = useExplorerChainNameByQuery()
+
+  const { data: chartData } = useQuery({
+    queryKey: [`v3/info/protocol/ProtocolChartData/${chainId}`, chainId],
+    queryFn: ({ signal }) => fetchChartData('v3', explorerChainName!, signal),
+    enabled: Boolean(explorerChainName),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return useMemo(() => chartData?.data ?? [], [chartData])
 }
 
 export const useProtocolData = (): ProtocolData | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
-  const [t24, t48] = getDeltaTimestamps()
-  const { blocks } = useBlockFromTimeStampSWR([t24, t48])
-  const { data } = useSWRImmutable(
-    chainId && blocks && blocks.length > 0 && [`v3/info/protocol/ProtocolData/${chainId}`, chainId],
-    () => fetchProtocolData(v3InfoClients[chainId], blocks),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const explorerChainName = useExplorerChainNameByQuery()
+
+  const { data } = useQuery({
+    queryKey: [`v3/info/protocol/ProtocolData/${chainId}`, chainId],
+    queryFn: ({ signal }) => fetchProtocolData(explorerChainName!, signal),
+    enabled: Boolean(explorerChainName),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return data?.data ?? undefined
 }
 
 export const useProtocolTransactionData = (): Transaction[] | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
-  const { data } = useSWRImmutable(
-    chainId && [`v3/info/protocol/ProtocolTransactionData/${chainId}`, chainId],
-    () => fetchTopTransactions(v3InfoClients[chainId]),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const explorerChainName = useExplorerChainNameByQuery()
+
+  const { data } = useQuery({
+    queryKey: [`v3/info/protocol/ProtocolTransactionData/${chainId}`, chainId],
+    queryFn: ({ signal }) => fetchTopTransactions(explorerChainName!, signal),
+    enabled: Boolean(explorerChainName),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return useMemo(() => data?.filter((d) => d.amountUSD > 0) ?? [], [data])
-}
-
-export const useTokenPriceChartData = (
-  address: string,
-  duration?: 'day' | 'week' | 'month' | 'year',
-  targetChianId?: ChainId,
-): PriceChartEntry[] | undefined => {
-  const chainName = useChainNameByQuery()
-  const chainId = multiChainId[chainName]
-  const utcCurrentTime = dayjs()
-  const startTimestamp = utcCurrentTime
-    .subtract(1, duration ?? 'day')
-    .startOf('hour')
-    .unix()
-
-  const { data } = useSWRImmutable(
-    chainId && address && [`v3/info/token/priceData/${address}/${duration}`, targetChianId ?? chainId],
-    () =>
-      fetchTokenPriceData(
-        address,
-        DURATION_INTERVAL[duration ?? 'day'],
-        startTimestamp,
-        v3InfoClients[targetChianId ?? chainId],
-        multiChainName[targetChianId ?? chainId],
-        SUBGRAPH_START_BLOCK[chainId],
-      ),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
-  return data?.data ?? []
 }
 
 // this is for the swap page and ROI calculator
 export const usePairPriceChartTokenData = (
-  address: string,
-  duration?: 'day' | 'week' | 'month' | 'year',
+  address?: string,
+  duration?: 'hour' | 'day' | 'week' | 'month' | 'year',
   targetChainId?: ChainId,
+  enabled = true,
 ): { data: PriceChartEntry[] | undefined; maxPrice?: number; minPrice?: number; averagePrice?: number } => {
   const chainName = useChainNameByQuery()
-  const chainId = targetChainId || multiChainId[chainName]
+  const chainId = targetChainId ?? (chainName ? multiChainId[chainName] : undefined)
 
-  const { data } = useSWRImmutable(
-    chainId &&
-      address &&
-      address !== 'undefined' && [`v3/info/token/pairPriceChartToken/${address}/${duration}`, targetChainId ?? chainId],
-    async () => {
-      const utcCurrentTime = dayjs()
-      const startTimestamp = utcCurrentTime
-        .subtract(1, duration ?? 'day')
-        .startOf('hour')
-        .unix()
-      return fetchPairPriceChartTokenData(
-        address,
-        DURATION_INTERVAL[duration ?? 'day'],
-        startTimestamp,
-        v3Clients[targetChainId ?? chainId],
-        multiChainName[targetChainId ?? chainId],
-        SUBGRAPH_START_BLOCK[chainId],
-      )
+  const { data } = useQuery({
+    queryKey: [`v3/info/token/pairPriceChartToken/${address}/${duration}`, targetChainId ?? chainId],
+
+    queryFn: async ({ signal }) => {
+      return fetchPairPriceChartTokenData(address!, chainIdToExplorerInfoChainName[chainId!], duration ?? 'day', signal)
     },
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+
+    enabled: Boolean(
+      enabled && chainId && chainIdToExplorerInfoChainName[chainId] && address && address !== 'undefined',
+    ),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return useMemo(
     () => ({
       data: data?.data ?? [],
@@ -150,11 +124,52 @@ export const usePairPriceChartTokenData = (
   )
 }
 
-export async function fetchTopTokens(dataClient: GraphQLClient, blocks: Block[]) {
+export async function fetchTopTokens(chainName: components['schemas']['ChainName'], signal: AbortSignal) {
   try {
-    const topTokenAddress = await fetchTopTokenAddresses(dataClient)
-    const data = await fetchedTokenDatas(dataClient, topTokenAddress.addresses ?? [], blocks)
-    return data
+    const data = await explorerApiClient
+      .GET('/cached/tokens/v3/{chainName}/list/top', {
+        signal,
+        params: {
+          path: {
+            chainName,
+          },
+        },
+      })
+      .then((res) => res.data)
+    if (!data) {
+      return {
+        data: {},
+        error: false,
+      }
+    }
+    return {
+      data: data.reduce(
+        (acc, item) => {
+          // eslint-disable-next-line no-param-reassign
+          acc[item.id] = {
+            ...item,
+            address: item.id,
+            volumeUSD: parseFloat(item.volumeUSD24h || '0'),
+            volumeUSDWeek: parseFloat(item.volumeUSD7d || '0'),
+            tvlUSD: parseFloat(item.tvlUSD),
+            volumeUSDChange: 0,
+            tvlUSDChange: 0,
+            exists: false,
+            txCount: item.txCount24h,
+            feesUSD: parseFloat(item.feeUSD24h),
+            tvlToken: 0,
+            priceUSDChange: getPercentChange(item.priceUSD, item.priceUSD24h),
+            priceUSDChangeWeek: 0,
+            priceUSD: parseFloat(item.priceUSD),
+          }
+          return acc
+        },
+        {} as {
+          [address: string]: TokenData
+        },
+      ),
+      error: false,
+    }
   } catch (e) {
     console.error(e)
     return {
@@ -171,135 +186,159 @@ export const useTopTokensData = ():
   | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
-  const [t24, t48, t7d] = getDeltaTimestamps()
-  const { blocks } = useBlockFromTimeStampSWR([t24, t48, t7d])
+  const explorerChainName = useExplorerChainNameByQuery()
 
-  const { data } = useSWRImmutable(
-    chainId && blocks && blocks.length > 0 && [`v3/info/token/TopTokensData/${chainId}`, chainId],
-    () =>
-      fetchTopTokens(
-        v3InfoClients[chainId],
-        blocks.filter((d) => d.number >= SUBGRAPH_START_BLOCK[chainId]),
-      ),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const { data } = useQuery({
+    queryKey: [`v3/info/token/TopTokensData/${chainId}`, chainId],
+
+    queryFn: ({ signal }) => fetchTopTokens(explorerChainName!, signal),
+    enabled: Boolean(explorerChainName),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return data?.data
 }
 
+const graphPerPage = 50
+
+const tokenDataFetcher = (dataClient: GraphQLClient, tokenAddresses: string[], blocks?: Block[]) => {
+  const times = Math.ceil(tokenAddresses.length / graphPerPage)
+  const addressGroup: Array<string[]> = []
+  for (let i = 0; i < times; i++) {
+    addressGroup.push(tokenAddresses.slice(i * graphPerPage, (i + 1) * graphPerPage))
+  }
+  return Promise.all(addressGroup.map((d) => fetchedTokenDatas(dataClient, d, blocks)))
+}
+
+/**
+ * @deprecated
+ */
 export const useTokensData = (addresses: string[], targetChainId?: ChainId): TokenData[] | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = targetChainId ?? multiChainId[chainName]
   const [t24, t48, t7d] = getDeltaTimestamps()
-  const { blocks } = useBlockFromTimeStampSWR([t24, t48, t7d], undefined, undefined, getChainName(chainId))
+  const { blocks } = useBlocksFromTimestamps([t24, t48, t7d], undefined, getChainName(chainId))
 
-  const { data } = useSWRImmutable(
-    chainId &&
-      blocks &&
-      addresses &&
-      addresses?.length > 0 &&
-      blocks?.length > 0 && [`v3/info/token/tokensData/${targetChainId}/${addresses.join()}`, chainId],
-    () =>
-      fetchedTokenDatas(
-        v3Clients[chainId], // TODO:  v3InfoClients[chainId],
+  const { data } = useQuery({
+    queryKey: [`v3/info/token/tokensData/${targetChainId}/${addresses?.join()}`, chainId],
+
+    queryFn: () =>
+      tokenDataFetcher(
+        v3InfoClients[chainId], // TODO:  v3InfoClients[chainId],
         addresses,
-        blocks.filter((d) => d.number >= SUBGRAPH_START_BLOCK[chainId]),
+        blocks?.filter((d) => d.number >= SUBGRAPH_START_BLOCK[chainId]),
       ),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
-  return useMemo(() => (data?.data ? Object.values(data?.data) : undefined), [data])
+
+    enabled: Boolean(chainId && blocks && addresses && addresses?.length > 0 && blocks?.length > 0),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
+  const allTokensData = useMemo(() => {
+    if (data) {
+      return data.reduce((acc, d) => {
+        return { ...acc, ...d.data }
+      }, {})
+    }
+    return undefined
+  }, [data])
+
+  return useMemo(() => (allTokensData ? Object.values(allTokensData) : undefined), [allTokensData])
 }
 
 export const useTokenData = (address: string): TokenData | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
-  const [t24, t48, t7d] = getDeltaTimestamps()
-  const { blocks } = useBlockFromTimeStampSWR([t24, t48, t7d])
+  const explorerChainName = useExplorerChainNameByQuery()
 
-  const { data } = useSWRImmutable(
-    chainId &&
-      blocks &&
-      address &&
-      address !== 'undefined' &&
-      blocks?.length > 0 && [`v3/info/token/tokenData/${chainId}/${address}`, chainId],
-    () =>
-      fetchedTokenDatas(
-        v3InfoClients[chainId],
-        [address],
-        blocks.filter((d) => d.number >= SUBGRAPH_START_BLOCK[chainId]),
-      ),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
-  return data?.data?.[address]
-}
+  const { data } = useQuery({
+    queryKey: [`v3/info/token/tokenData/${chainId}/${address}`, chainId],
 
-export const usePoolsForToken = (address: string): string[] | undefined => {
-  const chainName = useChainNameByQuery()
-  const chainId = multiChainId[chainName]
-  const { data } = useSWRImmutable(
-    chainId && address && [`v3/info/token/poolsForTOken/${chainId}/${address}`, chainId],
-    () => fetchPoolsForToken(address, v3InfoClients[chainId]),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
-  return data?.addresses
+    queryFn: ({ signal }) => fetchedTokenData(explorerChainName!, address, signal),
+
+    enabled: Boolean(explorerChainName && address && address !== 'undefined'),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
+
+  return data?.data
 }
 
 export const useTokenChartData = (address: string): TokenChartEntry[] | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
+  const explorerChainName = useExplorerChainNameByQuery()
 
-  const { data } = useSWRImmutable(
-    chainId && address && [`v3/info/token/tokenChartData/${chainId}/${address}`, chainId],
-    () => fetchTokenChartData(address, v3InfoClients[chainId]),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const { data } = useQuery({
+    queryKey: [`v3/info/token/tokenChartData/${chainId}/${address}`, chainId],
+    queryFn: ({ signal }) => fetchTokenChartData('v3', explorerChainName!, address, signal),
+    enabled: Boolean(explorerChainName && address && address !== 'undefined'),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return data?.data
 }
 
 export const useTokenPriceData = (
   address: string,
-  interval: number,
-  timeWindow: ManipulateType,
+  duration: 'day' | 'week' | 'month' | 'year',
 ): PriceChartEntry[] | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
-  const utcCurrentTime = dayjs()
-  const startTimestamp = utcCurrentTime
-    .subtract(1, timeWindow ?? 'day')
-    .startOf('hour')
-    .unix()
+  const explorerChainName = useExplorerChainNameByQuery()
 
-  const { data } = useSWRImmutable(
-    chainId && address && [`v3/info/token/tokenPriceData/${chainId}/${address}/${interval}/${timeWindow}`, chainId],
-    () =>
-      fetchTokenPriceData(
-        address,
-        interval,
-        startTimestamp,
-        v3InfoClients[chainId],
-        multiChainName[chainId],
-        SUBGRAPH_START_BLOCK[chainId],
-      ),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const { data } = useQuery({
+    queryKey: [`v3/info/token/tokenPriceData/${chainId}/${address}/${duration}`, chainId],
+
+    queryFn: ({ signal }) => fetchTokenPriceData(address, 'v3', duration, explorerChainName!, signal),
+
+    enabled: Boolean(explorerChainName && address && address !== 'undefined'),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return data?.data
 }
 
 export const useTokenTransactions = (address: string): Transaction[] | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
-  const { data } = useSWRImmutable(
-    chainId && address && [`v3/info/token/tokenTransaction/${chainId}/${address}`, chainId],
-    () => fetchTokenTransactions(address, v3InfoClients[chainId]),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const explorerChainName = useExplorerChainNameByQuery()
+
+  const { data } = useQuery({
+    queryKey: [`v3/info/token/tokenTransaction/${chainId}/${address}`, chainId],
+    queryFn: ({ signal }) => fetchTokenTransactions(address, explorerChainName!, signal),
+    enabled: Boolean(explorerChainName && address && address !== 'undefined'),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return useMemo(() => data?.data?.filter((d) => d.amountUSD > 0), [data])
 }
 
-export async function fetchTopPools(dataClient: GraphQLClient, chainId: ChainId, blocks: Block[]) {
+export async function fetchTopPools(chainName: components['schemas']['ChainName'], signal: AbortSignal) {
   try {
-    const topPoolAddress = await fetchTopPoolAddresses(dataClient, chainId)
-    const data = await fetchPoolDatas(dataClient, topPoolAddress.addresses ?? [], blocks)
-    return data
+    const data = await explorerApiClient
+      .GET('/cached/pools/v3/{chainName}/list/top', {
+        signal,
+        params: {
+          path: {
+            chainName,
+          },
+        },
+      })
+      .then((res) => res.data)
+    if (!data) {
+      return {
+        data: {},
+        error: false,
+      }
+    }
+    return {
+      data: data.reduce(
+        (acc, item) => {
+          return {
+            ...acc,
+            [item.id]: transformPoolData(item),
+          }
+        },
+        {} as {
+          [address: string]: PoolData
+        },
+      ),
+      error: false,
+    }
   } catch (e) {
     console.error(e)
     return {
@@ -316,130 +355,119 @@ export const useTopPoolsData = ():
   | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
-  const [t24, t48, t7d] = getDeltaTimestamps()
-  const { blocks } = useBlockFromTimeStampSWR([t24, t48, t7d])
+  const explorerChainName = useExplorerChainNameByQuery()
 
-  const { data } = useSWRImmutable(
-    chainId && blocks && blocks.length > 0 && [`v3/info/pool/TopPoolsData/${chainId}`, chainId],
-    () =>
-      fetchTopPools(
-        v3InfoClients[chainId],
-        chainId,
-        blocks.filter((d) => d.number >= SUBGRAPH_START_BLOCK[chainId]),
-      ),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const { data } = useQuery({
+    queryKey: [`v3/info/pool/TopPoolsData/${chainId}`, chainId],
+
+    queryFn: async ({ signal }) => {
+      return fetchTopPools(explorerChainName!, signal)
+    },
+    enabled: Boolean(explorerChainName),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return data?.data
 }
 
-export const usePoolsData = (addresses: string[]): PoolData[] | undefined => {
+export const usePoolsDataForToken = (address: string): PoolData[] | undefined => {
   const chainName = useChainNameByQuery()
-  const chainId = multiChainId[chainName]
-  const [t24, t48, t7d] = getDeltaTimestamps()
-  const { blocks } = useBlockFromTimeStampSWR([t24, t48, t7d])
+  const explorerChainName = useExplorerChainNameByQuery()
 
-  const { data } = useSWRImmutable(
-    chainId &&
-      blocks &&
-      blocks?.length > 0 &&
-      addresses &&
-      addresses?.length > 0 && [`v3/info/pool/poolsData/${chainId}/${addresses.join()}`, chainId],
-    () =>
-      fetchPoolDatas(
-        v3InfoClients[chainId],
-        addresses,
-        blocks.filter((d) => d.number >= SUBGRAPH_START_BLOCK[chainId]),
-      ),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
-  return useMemo(() => (data?.data ? Object.values(data.data) : undefined), [data])
+  const { data } = useQuery({
+    queryKey: [`v3/info/pool/poolsDataForToken/${chainName}/${address}`],
+
+    queryFn: ({ signal }) => {
+      return fetchPoolsForToken(address, explorerChainName!, signal)
+    },
+    enabled: Boolean(explorerChainName && address && address !== 'undefined'),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
+  return data?.data
 }
 
 export const usePoolData = (address: string): PoolData | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
-  const [t24, t48, t7d] = getDeltaTimestamps()
-  const { blocks } = useBlockFromTimeStampSWR([t24, t48, t7d])
+  const explorerChainName = useExplorerChainNameByQuery()
 
-  const { data } = useSWRImmutable(
-    chainId &&
-      blocks &&
-      blocks?.length > 0 &&
-      address &&
-      address !== 'undefined' && [`v3/info/pool/poolData/${chainId}/${address}`, chainId],
-    () =>
-      fetchPoolDatas(
-        v3InfoClients[chainId],
-        [address],
-        blocks.filter((d) => d.number >= SUBGRAPH_START_BLOCK[chainId]),
-      ),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
-  return data?.data?.[address] ?? undefined
+  const { data } = useQuery({
+    queryKey: [`v3/info/pool/poolData/${chainId}/${address}`, chainId],
+
+    queryFn: ({ signal }) => fetchedPoolData(explorerChainName!, address, signal),
+
+    enabled: Boolean(explorerChainName && address && address !== 'undefined'),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
+  return data?.data
 }
-export const usePoolTransactions = (address: string): Transaction[] | undefined => {
+export const usePoolTransactions = (address?: string): Transaction[] | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
+  const explorerChainName = useExplorerChainNameByQuery()
 
-  const { data } = useSWRImmutable(
-    chainId && address && [`v3/info/pool/poolTransaction/${chainId}/${address}`, chainId],
-    () => fetchPoolTransactions(address, v3InfoClients[chainId]),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const { data } = useQuery({
+    queryKey: [`v3/info/pool/poolTransaction/${chainId}/${address}`, chainId],
+    queryFn: ({ signal }) => fetchPoolTransactions(address!, explorerChainName!, signal),
+    enabled: Boolean(explorerChainName && address && address !== 'undefined'),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return useMemo(() => data?.data?.filter((d) => d.amountUSD > 0) ?? undefined, [data])
 }
 
 export const usePoolChartData = (address: string): PoolChartEntry[] | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
-  const { data } = useSWRImmutable(
-    chainId && address && address !== 'undefined' && [`v3/info/pool/poolChartData/${chainId}/${address}`, chainId],
-    () => fetchPoolChartData(address, v3InfoClients[chainId]),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const explorerChainName = useExplorerChainNameByQuery()
+
+  const { data } = useQuery({
+    queryKey: [`v3/info/pool/poolChartData/${chainId}/${address}`, chainId],
+    queryFn: ({ signal }) => fetchPoolChartData('v3', explorerChainName!, address, signal),
+    enabled: Boolean(explorerChainName && address && address !== 'undefined'),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return data?.data
 }
 
-export const usePoolTickData = (address: string): PoolTickData | undefined => {
+export const usePoolTickData = (address?: string): PoolTickData | undefined => {
   const chainName = useChainNameByQuery()
   const chainId = multiChainId[chainName]
+  const explorerChainName = useExplorerChainNameByQuery()
 
-  const { data } = useSWRImmutable(
-    chainId && address && [`v3/info/pool/poolTickData/${chainId}/${address}`, chainId],
-    () => fetchTicksSurroundingPrice(address, v3InfoClients[chainId], chainId),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const { data } = useQuery({
+    queryKey: [`v3/info/pool/poolTickData/${chainId}/${address}`, chainId],
+    queryFn: ({ signal }) => fetchTicksSurroundingPrice(address!, explorerChainName!, chainId, undefined, signal),
+    enabled: Boolean(explorerChainName && address && address !== 'undefined'),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   return data?.data ?? undefined
 }
 
-export const useSearchData = (
-  searchValue: string,
-): { tokens: TokenData[]; pools: PoolData[]; loading: boolean; error: any } => {
+export const useSearchData = (searchValue: string, enabled = true) => {
   const chainName = useChainNameByQuery()
-  const chainId = multiChainId[chainName]
-  const [t24, t48, t7d] = getDeltaTimestamps()
-  const { blocks } = useBlockFromTimeStampSWR([t24, t48, t7d])
-  const { data, status, error } = useSWRImmutable(
-    chainId && searchValue && [`v3/info/pool/searchData/${chainId}/${searchValue}`, chainId],
-    () =>
-      fetchSearchResults(
-        v3InfoClients[chainId],
-        searchValue,
-        blocks.filter((d) => d.number >= SUBGRAPH_START_BLOCK[chainId]),
-      ),
-    SWR_SETTINGS_WITHOUT_REFETCH,
-  )
+  const explorerChainName = useExplorerChainNameByQuery()
+
+  const { data, status, error } = useQuery({
+    queryKey: [`v3/info/pool/searchData/${chainName}/${searchValue}`, chainName],
+
+    queryFn: ({ signal }) => {
+      return fetchSearchResults(explorerChainName!, searchValue, signal)
+    },
+
+    enabled: Boolean(explorerChainName && searchValue && enabled),
+    ...QUERY_SETTINGS_IMMUTABLE,
+  })
   const searchResult = useMemo(() => {
-    if (data)
+    if (data) {
       return {
         ...data,
-        loading: status !== FetchStatus.Fetched,
+        loading: status !== 'success',
         error,
       }
+    }
     return {
       tokens: [],
       pools: [],
-      loading: status !== FetchStatus.Fetched,
+      loading: true,
       error,
     }
   }, [data, status, error])

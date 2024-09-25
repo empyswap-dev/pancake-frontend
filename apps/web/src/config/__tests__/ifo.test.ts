@@ -1,7 +1,11 @@
-import ifos from 'config/constants/ifo'
-import campaigns from 'config/constants/campaigns'
+import { getIfoConfig } from '@pancakeswap/ifos'
+import { ChainId } from '@pancakeswap/sdk'
 
-describe('Config IFOs', () => {
+import { campaigns } from '@pancakeswap/achievements'
+
+// TODO: multichain support
+describe('Config IFOs', async () => {
+  const ifos = await getIfoConfig(ChainId.BSC)
   it.each(ifos.map((ifo) => ifo.id))('IFO %s has an unique id', (id) => {
     const duplicates = ifos.filter((i) => id === i.id)
     expect(duplicates).toHaveLength(1)

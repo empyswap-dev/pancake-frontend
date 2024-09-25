@@ -1,19 +1,24 @@
-import { Text, TokenPairImage as UITokenPairImage, useMatchBreakpoints, Skeleton } from '@pancakeswap/uikit'
-import { Pool } from '@pancakeswap/widgets-internal'
+import { useTranslation } from '@pancakeswap/localization'
+import { checkIsBoostedPool } from '@pancakeswap/pools'
+import { Token } from '@pancakeswap/sdk'
+import { Box, Flex, Skeleton, Text, TokenPairImage as UITokenPairImage, useMatchBreakpoints } from '@pancakeswap/uikit'
+import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
+import { FarmWidget, Pool } from '@pancakeswap/widgets-internal'
 import BigNumber from 'bignumber.js'
 import { TokenPairImage } from 'components/TokenImage'
 import { vaultPoolConfig } from 'config/constants/pools'
-import { useTranslation } from '@pancakeswap/localization'
-import { memo, useMemo } from 'react'
+import { useActiveChainId } from 'hooks/useActiveChainId'
+import { ReactNode, memo, useMemo } from 'react'
 import { useVaultPoolByKey } from 'state/pools/hooks'
-import { VaultKey, DeserializedLockedCakeVault } from 'state/types'
+import { DeserializedLockedCakeVault, VaultKey } from 'state/types'
 import { styled } from 'styled-components'
-import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
-import { getVaultPosition, VaultPosition, VaultPositionParams } from 'utils/cakePool'
-import { Token } from '@pancakeswap/sdk'
+import { VaultPosition, VaultPositionParams, getVaultPosition } from 'utils/cakePool'
+
+const { AlpBoostedTag } = FarmWidget.Tags
 
 interface NameCellProps {
   pool: Pool.DeserializedPool<Token>
+  tooltip?: ReactNode
 }
 
 export const StyledCell = styled(Pool.BaseCell)`
@@ -21,20 +26,19 @@ export const StyledCell = styled(Pool.BaseCell)`
   flex-direction: row;
   padding-left: 12px;
   ${({ theme }) => theme.mediaQueries.sm} {
-    flex: 1 0 150px;
+    flex: 0 0 210px;
     padding-left: 32px;
   }
 `
 
-const NameCell: React.FC<React.PropsWithChildren<NameCellProps>> = ({ pool }) => {
+const NameCell: React.FC<React.PropsWithChildren<NameCellProps>> = ({ pool, tooltip }) => {
   const { t } = useTranslation()
+  const { chainId } = useActiveChainId()
   const { isMobile } = useMatchBreakpoints()
   const { sousId, stakingToken, earningToken, userData, isFinished, vaultKey, totalStaked } = pool
-  const vaultData = useVaultPoolByKey(pool.vaultKey)
-  const {
-    userData: { userShares },
-    totalCakeInVault,
-  } = vaultData
+  const vaultData = useVaultPoolByKey(pool?.vaultKey || VaultKey.CakeVault)
+  const { totalCakeInVault } = vaultData
+  const userShares = vaultData?.userData?.userShares ?? BIG_ZERO
   const hasVaultShares = userShares.gt(0)
 
   const stakingTokenSymbol = stakingToken.symbol
@@ -60,6 +64,11 @@ const NameCell: React.FC<React.PropsWithChildren<NameCellProps>> = ({ pool }) =>
     }
     return totalStaked && totalStaked.gte(0)
   }, [pool.vaultKey, totalCakeInVault, totalStaked])
+
+  const isBoostedPool = useMemo(
+    () => Boolean(!isFinished && chainId && checkIsBoostedPool(pool.contractAddress, chainId)),
+    [pool, isFinished, chainId],
+  )
 
   return (
     <StyledCell role="cell">
@@ -88,21 +97,29 @@ const NameCell: React.FC<React.PropsWithChildren<NameCellProps>> = ({ pool }) =>
               (vaultKey === VaultKey.CakeVault ? (
                 <StakedCakeStatus
                   userShares={userShares}
-                  locked={(vaultData as DeserializedLockedCakeVault).userData.locked}
-                  lockEndTime={(vaultData as DeserializedLockedCakeVault).userData.lockEndTime}
+                  locked={(vaultData as DeserializedLockedCakeVault)?.userData?.locked}
+                  lockEndTime={(vaultData as DeserializedLockedCakeVault)?.userData?.lockEndTime}
                 />
               ) : (
                 <Text fontSize="12px" bold color={isFinished ? 'failure' : 'secondary'} textTransform="uppercase">
                   {t('Staked')}
                 </Text>
               ))}
-            <Text bold={!isMobile} small={isMobile}>
-              {title}
-            </Text>
+            <Flex>
+              <Text bold={!isMobile} small={isMobile}>
+                {title}
+              </Text>
+              {tooltip}
+            </Flex>
             {showSubtitle && (
               <Text fontSize="12px" color="textSubtle">
                 {subtitle}
               </Text>
+            )}
+            {!isMobile && isBoostedPool && (
+              <Box width="fit-content" mt="4px">
+                <AlpBoostedTag scale="sm" />
+              </Box>
             )}
           </Pool.CellContent>
         </>

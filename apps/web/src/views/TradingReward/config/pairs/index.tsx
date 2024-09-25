@@ -1,26 +1,34 @@
 import { ChainId } from '@pancakeswap/chains'
 import { ComputedFarmConfigV3, FarmV3SupportedChainId } from '@pancakeswap/farms/src'
-import { farmsV3 as ethFarm } from '@pancakeswap/farms/constants/eth'
-import { farmsV3 as farm5 } from '@pancakeswap/farms/constants/goerli'
-import { farmsV3 as bscFarm } from '@pancakeswap/farms/constants/bsc'
-import { farmsV3 as farm97 } from '@pancakeswap/farms/constants/bscTestnet'
-import { farmsV3 as zkEvmFarm } from '@pancakeswap/farms/constants/polygonZkEVM'
-import { farmsV3 as zkSyncFarm } from '@pancakeswap/farms/constants/zkSync'
-import { farmsV3 as lineaFarm } from '@pancakeswap/farms/constants/linea'
-import { farmsV3 as arbitrumFarm } from '@pancakeswap/farms/constants/arb'
-import { farmsV3 as baseFarm } from '@pancakeswap/farms/constants/base'
-import { tradingRewardV3Pair as tradingRewardV3Pair56 } from './56'
+
+// Edge Case Farms
+import { legacyV3ArbFarmConfig } from '@pancakeswap/farms/src/farms/arb'
+import { legacyV3BaseFarmConfig } from '@pancakeswap/farms/src/farms/base'
+import { legacyV3BscFarmConfig } from '@pancakeswap/farms/src/farms/bsc'
+import { legacyV3BscTestnetFarmConfig } from '@pancakeswap/farms/src/farms/bscTestnet'
+import { legacyV3EthereumFarmConfig } from '@pancakeswap/farms/src/farms/eth'
+import { legacyV3LineaFarmConfig } from '@pancakeswap/farms/src/farms/linea'
+import { legacyV3OpBNBFarmConfig } from '@pancakeswap/farms/src/farms/opBNB'
+import { legacyV3OpBNBTestnetFarmConfig } from '@pancakeswap/farms/src/farms/opBnbTestnet'
+import { legacyV3PolygonZkEVMFarmConfig } from '@pancakeswap/farms/src/farms/polygonZkEVM'
+import { legacyV3ZkSyncFarmConfig } from '@pancakeswap/farms/src/farms/zkSync'
+import { tradingRewardBaseV3Pair } from './edgeCasesFarms/baseFarm'
+import { tradingRewardBscV3Pair } from './edgeCasesFarms/bscFarm'
+import { tradingRewardLineaV3Pair } from './edgeCasesFarms/lineaFarm'
+import { tradingRewardZkEvmV3Pair } from './edgeCasesFarms/zkEVMFarm'
+import { tradingRewardZkSyncV3Pair } from './edgeCasesFarms/zkSyncFarm'
 
 export const tradingRewardPairConfigChainMap: Record<FarmV3SupportedChainId, ComputedFarmConfigV3[]> = {
-  [ChainId.ETHEREUM]: ethFarm,
-  [ChainId.GOERLI]: farm5,
-  [ChainId.BSC]: [...bscFarm, ...tradingRewardV3Pair56],
-  [ChainId.BSC_TESTNET]: farm97,
-  [ChainId.POLYGON_ZKEVM]: zkEvmFarm,
+  [ChainId.ETHEREUM]: legacyV3EthereumFarmConfig,
+  [ChainId.BSC]: [...legacyV3BscFarmConfig, ...tradingRewardBscV3Pair],
+  [ChainId.BSC_TESTNET]: legacyV3BscTestnetFarmConfig,
+  [ChainId.POLYGON_ZKEVM]: [...legacyV3PolygonZkEVMFarmConfig, ...tradingRewardZkEvmV3Pair],
   [ChainId.POLYGON_ZKEVM_TESTNET]: [],
-  [ChainId.ZKSYNC]: zkSyncFarm,
+  [ChainId.ZKSYNC]: [...legacyV3ZkSyncFarmConfig, ...tradingRewardZkSyncV3Pair],
   [ChainId.ZKSYNC_TESTNET]: [],
-  [ChainId.ARBITRUM_ONE]: arbitrumFarm,
-  [ChainId.LINEA]: lineaFarm,
-  [ChainId.BASE]: baseFarm,
+  [ChainId.ARBITRUM_ONE]: legacyV3ArbFarmConfig,
+  [ChainId.LINEA]: [...legacyV3LineaFarmConfig, ...tradingRewardLineaV3Pair],
+  [ChainId.BASE]: [...legacyV3BaseFarmConfig, ...tradingRewardBaseV3Pair],
+  [ChainId.OPBNB_TESTNET]: legacyV3OpBNBTestnetFarmConfig,
+  [ChainId.OPBNB]: legacyV3OpBNBFarmConfig,
 }

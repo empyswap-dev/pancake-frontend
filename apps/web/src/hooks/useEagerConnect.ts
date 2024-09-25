@@ -1,25 +1,18 @@
-import { useConfig, useConnect } from 'wagmi'
+import { isInBinance } from '@binance/w3w-utils'
+import { isCyberWallet } from '@cyberlab/cyber-app-sdk'
 import { useEffect } from 'react'
-import { CHAINS } from 'config/chains'
+import { useConfig, useConnect } from 'wagmi'
+
+import { binanceWeb3WalletConnector, cyberWalletConnector } from 'utils/wagmi'
 
 const useEagerConnect = () => {
   const config = useConfig()
   const { connectAsync, connectors } = useConnect()
   useEffect(() => {
-    if (
-      !(typeof window === 'undefined') &&
-      window?.parent !== window &&
-      // @ts-ignore
-      !window.cy
-    ) {
-      import('wagmi/connectors/safe').then(({ SafeConnector }) => {
-        const safe = new SafeConnector({ chains: CHAINS })
-        connectAsync({ connector: safe }).catch(() => {
-          config.autoConnect()
-        })
-      })
-    } else {
-      config.autoConnect()
+    if (!(typeof window === 'undefined') && window?.parent !== window && isCyberWallet() && cyberWalletConnector) {
+      connectAsync({ connector: cyberWalletConnector as any })
+    } else if (isInBinance()) {
+      connectAsync({ connector: binanceWeb3WalletConnector() })
     }
   }, [config, connectAsync, connectors])
 }

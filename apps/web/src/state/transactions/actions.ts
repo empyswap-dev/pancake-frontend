@@ -1,6 +1,6 @@
-import { createAction } from '@reduxjs/toolkit'
-import { ChainId } from '@pancakeswap/chains'
 import { Order } from '@gelatonetwork/limit-orders-lib'
+import { ChainId } from '@pancakeswap/chains'
+import { createAction } from '@reduxjs/toolkit'
 
 export type TransactionType =
   | 'approve'
@@ -9,14 +9,17 @@ export type TransactionType =
   | 'add-liquidity'
   | 'increase-liquidity-v3'
   | 'add-liquidity-v3'
+  | 'zap-liquidity-v3'
   | 'remove-liquidity-v3'
   | 'collect-fee'
   | 'remove-liquidity'
   | 'limit-order-submission'
   | 'limit-order-cancellation'
   | 'limit-order-approval'
-  | 'non-bsc-farm'
+  | 'cross-chain-farm'
   | 'migrate-v3'
+  | 'bridge-icake'
+  | 'claim-liquid-staking'
 
 export interface SerializableTransactionReceipt {
   to: string
@@ -44,12 +47,12 @@ export enum FarmTransactionStatus {
   SUCCESS = 1,
 }
 
-export enum NonBscFarmStepType {
+export enum CrossChainFarmStepType {
   STAKE = 'STAKE',
   UNSTAKE = 'UNSTAKE',
 }
 
-export interface NonBscFarmTransactionStep {
+export interface CrossChainFarmTransactionStep {
   step: number
   chainId: number
   status: FarmTransactionStatus
@@ -58,13 +61,13 @@ export interface NonBscFarmTransactionStep {
   msgStatus?: MsgStatus
 }
 
-export interface NonBscFarmTransactionType {
-  type: NonBscFarmStepType
+export interface CrossChainFarmTransactionType {
+  type: CrossChainFarmStepType
   status: FarmTransactionStatus
   amount: string
   lpAddress: string
   lpSymbol: string
-  steps: NonBscFarmTransactionStep[]
+  steps: CrossChainFarmTransactionStep[]
 }
 
 export const addTransaction = createAction<{
@@ -74,10 +77,10 @@ export const addTransaction = createAction<{
   approval?: { tokenAddress: string; spender: string }
   claim?: { recipient: string }
   summary?: string
-  translatableSummary?: { text: string; data?: Record<string, string | number> }
+  translatableSummary?: { text: string; data?: Record<string, string | number | undefined> }
   type?: TransactionType
   order?: Order
-  nonBscFarm?: NonBscFarmTransactionType
+  crossChainFarm?: CrossChainFarmTransactionType
 }>('transactions/addTransaction')
 export const clearAllTransactions = createAction('transactions/clearAllTransactions')
 export const clearAllChainTransactions = createAction<{ chainId: ChainId }>('transactions/clearAllChainTransactions')
@@ -85,7 +88,7 @@ export const finalizeTransaction = createAction<{
   chainId: ChainId
   hash: string
   receipt: SerializableTransactionReceipt
-  nonBscFarm?: NonBscFarmTransactionType
+  crossChainFarm?: CrossChainFarmTransactionType
 }>('transactions/finalizeTransaction')
 export const checkedTransaction = createAction<{
   chainId: ChainId

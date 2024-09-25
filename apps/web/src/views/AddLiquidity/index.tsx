@@ -1,44 +1,45 @@
-import { ReactElement, useCallback, useMemo, useState } from 'react'
+import { useTranslation } from '@pancakeswap/localization'
 import { Currency, CurrencyAmount, Pair, Percent, Price, Token } from '@pancakeswap/sdk'
 import { useModal } from '@pancakeswap/uikit'
-import { useTranslation } from '@pancakeswap/localization'
 import { useUserSlippage } from '@pancakeswap/utils/user'
+import { ReactElement, useCallback, useMemo, useState } from 'react'
 
 import { V2_ROUTER_ADDRESS } from 'config/constants/exchange'
 import { useIsTransactionUnsupported, useIsTransactionWarning } from 'hooks/Trades'
 import { useLPApr } from 'state/swap/useLPApr'
+import { logGTMAddLiquidityTxSentEvent, logGTMClickAddLiquidityConfirmEvent } from 'utils/customGTMEventTracking'
+import { formatCurrencyAmount } from 'utils/formatCurrencyAmount'
 import { isUserRejected, logError } from 'utils/sentry'
 import { transactionErrorToUserReadableMessage } from 'utils/transactionErrorToUserReadableMessage'
-import { formatCurrencyAmount } from 'utils/formatCurrencyAmount'
-import { Hash } from 'viem'
-import { SendTransactionResult } from 'wagmi/actions'
+import { Address, Hash } from 'viem'
+import { useWalletClient } from 'wagmi'
 
 import useAccountActiveChain from 'hooks/useAccountActiveChain'
 import { ApprovalState, useApproveCallback } from 'hooks/useApproveCallback'
 import { PairState } from 'hooks/usePairs'
-import { Field } from 'state/mint/actions'
+import { CurrencyField as Field } from 'utils/types'
 import { useDerivedMintInfo, useMintActionHandlers } from 'state/mint/hooks'
 
+import { SettingsMode } from 'components/Menu/GlobalSettings/types'
+import { useAddLiquidityV2FormState } from 'state/mint/reducer'
 import { useTransactionAdder } from 'state/transactions/hooks'
 import { useGasPrice, usePairAdder } from 'state/user/hooks'
 import { calculateGasMargin } from 'utils'
 import { calculateSlippageAmount, useRouterContract } from 'utils/exchange'
 import { maxAmountSpend } from 'utils/maxAmountSpend'
-import { SettingsMode } from 'components/Menu/GlobalSettings/types'
-import { useAddLiquidityV2FormState } from 'state/mint/reducer'
+import SettingsModal from '../../components/Menu/GlobalSettings/SettingsModal'
+import { useTransactionDeadline } from '../../hooks/useTransactionDeadline'
 import ConfirmAddLiquidityModal from './components/ConfirmAddLiquidityModal'
 import { useCurrencySelectRoute } from './useCurrencySelectRoute'
-import SettingsModal from '../../components/Menu/GlobalSettings/SettingsModal'
-import useTransactionDeadline from '../../hooks/useTransactionDeadline'
 
 export interface LP2ChildrenProps {
-  error: string
+  error?: string
   currencies: {
     [Field.CURRENCY_A]?: Currency
     [Field.CURRENCY_B]?: Currency
   }
   isOneWeiAttack?: boolean
-  noLiquidity: boolean
+  noLiquidity?: boolean
   handleCurrencyASelect: (currencyA_: Currency) => void
   formattedAmounts: {
     [Field.CURRENCY_A]?: string
@@ -49,29 +50,29 @@ export interface LP2ChildrenProps {
   handleCurrencyBSelect: (currencyB_: Currency) => void
   onFieldBInput: (typedValue: string) => void
   pairState: PairState
-  poolTokenPercentage: Percent
-  price: Price<Currency, Currency>
+  poolTokenPercentage?: Percent
+  price?: Price<Currency, Currency>
   onPresentSettingsModal: () => void
   allowedSlippage: number
-  pair: Pair
-  poolData: {
+  pair?: Pair | null
+  poolData?: {
     lpApr7d: number
-  }
+  } | null
   shouldShowApprovalGroup: boolean
   showFieldAApproval: boolean
-  approveACallback: () => Promise<SendTransactionResult>
-  revokeACallback: () => Promise<SendTransactionResult>
+  approveACallback: () => Promise<{ hash: Address } | undefined>
+  revokeACallback: () => Promise<{ hash: Address } | undefined>
   currentAllowanceA: CurrencyAmount<Currency> | undefined
   approvalA: ApprovalState
   showFieldBApproval: boolean
-  approveBCallback: () => Promise<SendTransactionResult>
-  revokeBCallback: () => Promise<SendTransactionResult>
+  approveBCallback: () => Promise<{ hash: Address } | undefined>
+  revokeBCallback: () => Promise<{ hash: Address } | undefined>
   currentAllowanceB: CurrencyAmount<Currency> | undefined
   approvalB: ApprovalState
   onAdd: () => Promise<void>
   onPresentAddLiquidityModal: () => void
   buttonDisabled: boolean
-  errorText: string
+  errorText?: string
   addIsWarning: boolean
   addIsUnsupported: boolean
   pendingText: string
@@ -82,10 +83,11 @@ export default function AddLiquidity({
   currencyB,
   children,
 }: {
-  currencyA: Currency
-  currencyB: Currency
+  currencyA?: Currency | null
+  currencyB?: Currency | null
   children: (props: LP2ChildrenProps) => ReactElement
 }) {
+  const { data: walletClient } = useWalletClient()
   const { account, chainId } = useAccountActiveChain()
 
   const addPair = usePairAdder()
@@ -114,7 +116,7 @@ export default function AddLiquidity({
     isOneWeiAttack,
   } = useDerivedMintInfo(currencyA ?? undefined, currencyB ?? undefined)
 
-  const poolData = useLPApr(pair)
+  const poolData = useLPApr('v2', pair)
 
   const { onFieldAInput, onFieldBInput } = useMintActionHandlers(noLiquidity)
 
@@ -130,7 +132,7 @@ export default function AddLiquidity({
   })
 
   // txn values
-  const deadline = useTransactionDeadline() // custom from users settings
+  const [deadline] = useTransactionDeadline() // custom from users settings
   const [allowedSlippage] = useUserSlippage() // custom from users
 
   // get the max amounts user can add
@@ -163,20 +165,21 @@ export default function AddLiquidity({
     approveCallback: approveACallback,
     revokeCallback: revokeACallback,
     currentAllowance: currentAllowanceA,
-  } = useApproveCallback(parsedAmounts[Field.CURRENCY_A], V2_ROUTER_ADDRESS[chainId])
+  } = useApproveCallback(parsedAmounts[Field.CURRENCY_A], chainId ? V2_ROUTER_ADDRESS[chainId] : undefined)
   const {
     approvalState: approvalB,
     approveCallback: approveBCallback,
     revokeCallback: revokeBCallback,
     currentAllowance: currentAllowanceB,
-  } = useApproveCallback(parsedAmounts[Field.CURRENCY_B], V2_ROUTER_ADDRESS[chainId])
+  } = useApproveCallback(parsedAmounts[Field.CURRENCY_B], chainId && V2_ROUTER_ADDRESS[chainId])
 
   const addTransaction = useTransactionAdder()
 
   const routerContract = useRouterContract()
 
   async function onAdd() {
-    if (!chainId || !account || !routerContract) return
+    logGTMClickAddLiquidityConfirmEvent()
+    if (!chainId || !account || !routerContract || !walletClient) return
 
     const { [Field.CURRENCY_A]: parsedAmountA, [Field.CURRENCY_B]: parsedAmountB } = mintParsedAmounts
     if (!parsedAmountA || !parsedAmountB || !currencyA || !currencyB || !deadline) {
@@ -231,14 +234,14 @@ export default function AddLiquidity({
         ? { value, account: routerContract.account, chain: routerContract.chain }
         : { account: routerContract.account, chain: routerContract.chain },
     )
-      .then((estimatedGasLimit) =>
+      .then((estimatedGasLimit: any) =>
         method(args, {
           ...(value ? { value } : {}),
-          gasLimit: calculateGasMargin(estimatedGasLimit),
+          gas: calculateGasMargin(estimatedGasLimit),
           gasPrice,
         }).then((response: Hash) => {
           setLiquidityState({ attemptingTxn: false, liquidityErrorMessage: undefined, txHash: response })
-
+          logGTMAddLiquidityTxSentEvent()
           const symbolA = currencies[Field.CURRENCY_A]?.symbol
           const amountA = parsedAmounts[Field.CURRENCY_A]?.toSignificant(3)
           const symbolB = currencies[Field.CURRENCY_B]?.symbol
@@ -260,7 +263,7 @@ export default function AddLiquidity({
           }
         }),
       )
-      ?.catch((err) => {
+      ?.catch((err: any) => {
         if (err && !isUserRejected(err)) {
           logError(err)
           console.error(`Add Liquidity failed`, err, args, value)

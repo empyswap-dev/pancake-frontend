@@ -9,13 +9,11 @@ import {
   ChartIcon,
   HistoryIcon,
   IconButton,
-  useMatchBreakpoints,
 } from '@pancakeswap/uikit'
 import useLocalDispatch from 'contexts/LocalRedux/useLocalDispatch'
-import { PredictionStatus } from 'state/types'
+import { PredictionStatus } from '@pancakeswap/prediction'
 import { useGetPredictionsStatus, useIsChartPaneOpen, useIsHistoryPaneOpen } from 'state/predictions/hooks'
 import { setChartPaneState, setHistoryPaneState } from 'state/predictions'
-import Image from 'next/image'
 import useSwiper from '../hooks/useSwiper'
 
 const ButtonNav = styled.div`
@@ -41,17 +39,6 @@ const StyledMobileMenu = styled.div`
   }
 `
 
-const BunnyContainer = styled.div`
-  position: relative;
-  left: -42%;
-  top: -15px;
-  margin-top: -125px;
-
-  ${({ theme }) => theme.mediaQueries.sm} {
-    margin-top: -155px;
-  }
-`
-
 const getActiveIndex = (isHistoryOpen: boolean, isChartOpen: boolean) => {
   if (isHistoryOpen) {
     return 2
@@ -73,8 +60,6 @@ const MobileMenu = () => {
   const dispatch = useLocalDispatch()
   const { address: account } = useAccount()
 
-  const { isMobile } = useMatchBreakpoints()
-
   const handleItemClick = (index: number) => {
     switch (index) {
       case 2:
@@ -94,21 +79,11 @@ const MobileMenu = () => {
   return (
     <StyledMobileMenu>
       <ButtonNav>
-        <IconButton variant="text" onClick={() => swiper.slidePrev()} disabled={status !== PredictionStatus.LIVE}>
+        <IconButton variant="text" onClick={() => swiper?.slidePrev()} disabled={status !== PredictionStatus.LIVE}>
           <ArrowBackIcon width="24px" color="primary" />
         </IconButton>
       </ButtonNav>
       <TabNav>
-        {activeIndex === 0 && (
-          <BunnyContainer>
-            <Image
-              width={isMobile ? 134 : 164}
-              height={isMobile ? 125 : 155}
-              src="/images/predictions/birthday/mobile-bunny.png"
-              alt="mobile-bunny"
-            />
-          </BunnyContainer>
-        )}
         <ButtonMenu activeIndex={activeIndex} scale="sm" variant="subtle" onItemClick={handleItemClick}>
           <ButtonMenuItem>
             <Cards color="currentColor" />
@@ -122,7 +97,7 @@ const MobileMenu = () => {
         </ButtonMenu>
       </TabNav>
       <ButtonNav>
-        <IconButton variant="text" onClick={() => swiper.slideNext()} disabled={status !== PredictionStatus.LIVE}>
+        <IconButton variant="text" onClick={() => swiper?.slideNext()} disabled={status !== PredictionStatus.LIVE}>
           <ArrowForwardIcon width="24px" color="primary" />
         </IconButton>
       </ButtonNav>

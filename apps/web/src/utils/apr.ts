@@ -1,10 +1,11 @@
-import BigNumber from 'bignumber.js'
 import { ChainId } from '@pancakeswap/chains'
+import { YEAR_IN_SECONDS } from '@pancakeswap/utils/getTimePeriods'
+import BigNumber from 'bignumber.js'
 import { BLOCKS_PER_YEAR } from 'config'
-import lpAprs56 from 'config/constants/lpAprs/56.json'
 import lpAprs1 from 'config/constants/lpAprs/1.json'
+import lpAprs56 from 'config/constants/lpAprs/56.json'
 
-const getLpApr = (chainId: number) => {
+const getLpApr = (chainId?: number) => {
   switch (chainId) {
     case ChainId.BSC:
       return lpAprs56
@@ -43,33 +44,41 @@ const BIG_NUMBER_NAN = new BigNumber(NaN)
 
 /**
  * Get farm APR value in %
+ * @param chainId
  * @param poolWeight allocationPoint / totalAllocationPoint
  * @param cakePriceUsd Cake price in USD
  * @param poolLiquidityUsd Total pool liquidity in USD
  * @param farmAddress Farm Address
+ * @param regularCakePerBlock
  * @returns Farm Apr
  */
 export const getFarmApr = (
-  chainId: number,
-  poolWeight: BigNumber | null,
+  chainId: number | undefined,
+  poolWeight: BigNumber | null | undefined,
   cakePriceUsd: BigNumber | null,
-  poolLiquidityUsd: BigNumber | null,
+  poolLiquidityUsd: BigNumber | null | undefined,
   farmAddress: string | null,
   regularCakePerBlock: number,
-): { cakeRewardsApr: number; lpRewardsApr: number } => {
-  const yearlyCakeRewardAllocation = poolWeight
+  lpRewardsApr?: number,
+  cakePerSecFromBCake?: number,
+): { cakeRewardsApr: number | null; lpRewardsApr: number } => {
+  const yearlyCakeRewardAllocation = cakePerSecFromBCake
+    ? new BigNumber(cakePerSecFromBCake).times(YEAR_IN_SECONDS)
+    : poolWeight
     ? poolWeight.times(BLOCKS_PER_YEAR * regularCakePerBlock)
     : new BigNumber(NaN)
   const cakeRewardsApr = yearlyCakeRewardAllocation
     .times(cakePriceUsd || BIG_NUMBER_NAN)
     .div(poolLiquidityUsd || BIG_NUMBER_NAN)
     .times(100)
-  let cakeRewardsAprAsNumber = null
+  let cakeRewardsAprAsNumber: number | null = null
   if (!cakeRewardsApr.isNaN() && cakeRewardsApr.isFinite()) {
     cakeRewardsAprAsNumber = cakeRewardsApr.toNumber()
   }
-  const lpRewardsApr = (getLpApr(chainId)[farmAddress?.toLowerCase()] || getLpApr(chainId)[farmAddress]) ?? 0 // can get both checksummed or lowercase
-  return { cakeRewardsApr: cakeRewardsAprAsNumber, lpRewardsApr }
+  const lpApr =
+    lpRewardsApr ??
+    (farmAddress ? (getLpApr(chainId)[farmAddress?.toLowerCase()] || getLpApr(chainId)[farmAddress]) ?? 0 : 0) // can get both checksummed or lowercase
+  return { cakeRewardsApr: cakeRewardsAprAsNumber, lpRewardsApr: lpApr }
 }
 
 export default null

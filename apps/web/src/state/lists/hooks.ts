@@ -1,29 +1,30 @@
 import { ChainId } from '@pancakeswap/chains'
-import { TokenAddressMap as TTokenAddressMap, WrappedTokenInfo, TokenList, TokenInfo } from '@pancakeswap/token-lists'
-import { enumValues } from '@pancakeswap/utils/enumValues'
+import { TokenAddressMap as TTokenAddressMap, TokenInfo, TokenList, WrappedTokenInfo } from '@pancakeswap/token-lists'
 import { ListsState } from '@pancakeswap/token-lists/react'
+import { EMPTY_LIST } from '@pancakeswap/tokens'
+import { enumValues } from '@pancakeswap/utils/enumValues'
 import {
   DEFAULT_LIST_OF_LISTS,
+  MULTI_CHAIN_LIST_URLS,
   OFFICIAL_LISTS,
   UNSUPPORTED_LIST_URLS,
   WARNING_LIST_URLS,
-  MULTI_CHAIN_LIST_URLS,
 } from 'config/constants/lists'
+import { useActiveChainId } from 'hooks/useActiveChainId'
 import { atom, useAtomValue } from 'jotai'
-import mapValues from 'lodash/mapValues'
 import groupBy from 'lodash/groupBy'
 import keyBy from 'lodash/keyBy'
+import mapValues from 'lodash/mapValues'
 import _pickBy from 'lodash/pickBy'
-import { EMPTY_LIST } from '@pancakeswap/tokens'
 import uniqBy from 'lodash/uniqBy'
 import { useMemo } from 'react'
-import { useActiveChainId } from 'hooks/useActiveChainId'
+import { notEmpty } from 'utils/notEmpty'
 import DEFAULT_TOKEN_LIST from '../../config/constants/tokenLists/pancake-default.tokenlist.json'
+import ONRAMP_TOKEN_LIST from '../../config/constants/tokenLists/pancake-supported-onramp-currency-list.json'
 import UNSUPPORTED_TOKEN_LIST from '../../config/constants/tokenLists/pancake-unsupported.tokenlist.json'
 import WARNING_TOKEN_LIST from '../../config/constants/tokenLists/pancake-warning.tokenlist.json'
-import ONRAMP_TOKEN_LIST from '../../config/constants/tokenLists/pancake-supported-onramp-currency-list.json'
-import { listsAtom } from './lists'
 import { safeGetAddress } from '../../utils'
+import { listsAtom } from './lists'
 
 type TokenAddressMap = TTokenAddressMap<ChainId>
 
@@ -111,7 +112,7 @@ export const combinedTokenMapFromOfficialsUrlsAtom = atom((get) => {
 export const tokenListFromOfficialsUrlsAtom = atom((get) => {
   const lists: ListsState['byUrl'] = get(selectorByUrlsAtom)
 
-  const mergedTokenLists: TokenInfo[] = OFFICIAL_LISTS.reduce((acc, url) => {
+  const mergedTokenLists: TokenInfo[] = OFFICIAL_LISTS.reduce<TokenInfo[]>((acc, url) => {
     if (lists?.[url]?.current?.tokens) {
       acc.push(...(lists?.[url]?.current?.tokens || []))
     }
@@ -132,7 +133,7 @@ export const tokenListFromOfficialsUrlsAtom = atom((get) => {
 export const combinedTokenMapFromUnsupportedUrlsAtom = atom((get) => {
   const lists = get(selectorByUrlsAtom)
   // get hard coded unsupported tokens
-  const localUnsupportedListMap = listToTokenMap(UNSUPPORTED_TOKEN_LIST, 'address')
+  const localUnsupportedListMap = listToTokenMap(UNSUPPORTED_TOKEN_LIST as TokenList, 'address')
   // get any loaded unsupported tokens
   const loadedUnsupportedListMap = combineTokenMaps(lists, UNSUPPORTED_LIST_URLS)
 
@@ -166,7 +167,7 @@ export function listToTokenMap(list: TokenList, key?: string): TokenAddressMap {
       }
       return null
     })
-    .filter(Boolean)
+    .filter(notEmpty)
 
   const groupedTokenMap: { [chainId: string]: WrappedTokenInfo[] } = groupBy(tokenMap, 'chainId')
 
@@ -199,10 +200,22 @@ export function useAllLists(): {
   }
 } {
   const { chainId } = useActiveChainId()
-
+  return useAllListsByChainId(chainId)
+}
+export function useAllListsByChainId(chainId: number): {
+  readonly [url: string]: {
+    readonly current: TokenList | null
+    readonly pendingUpdate: TokenList | null
+    readonly loadingRequestId: string | null
+    readonly error: string | null
+  }
+} {
   const urls = useAtomValue(selectorByUrlsAtom)
 
-  return useMemo(() => _pickBy(urls, (_, url) => MULTI_CHAIN_LIST_URLS[chainId]?.includes(url)), [chainId, urls])
+  return useMemo(
+    () => _pickBy(urls, (_, url) => chainId && MULTI_CHAIN_LIST_URLS[chainId]?.includes(url)),
+    [chainId, urls],
+  )
 }
 
 function combineMaps(map1: TokenAddressMap, map2: TokenAddressMap): TokenAddressMap {
@@ -216,9 +229,13 @@ function combineMaps(map1: TokenAddressMap, map2: TokenAddressMap): TokenAddress
 // filter out unsupported lists
 export function useActiveListUrls(): string[] | undefined {
   const { chainId } = useActiveChainId()
+  return useActiveListUrlsByChainId(chainId)
+}
+
+export function useActiveListUrlsByChainId(chainId: number): string[] | undefined {
   const urls = useAtomValue(activeListUrlsAtom)
 
-  return useMemo(() => urls.filter((url) => MULTI_CHAIN_LIST_URLS[chainId]?.includes(url)), [urls, chainId])
+  return useMemo(() => urls.filter((url) => chainId && MULTI_CHAIN_LIST_URLS[chainId]?.includes(url)), [urls, chainId])
 }
 
 export function useInactiveListUrls() {

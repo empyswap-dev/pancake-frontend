@@ -1,15 +1,18 @@
 import { useTranslation } from '@pancakeswap/localization'
+import { bscTokens } from '@pancakeswap/tokens'
 import { Flex, FlexLayout, Heading, PageHeader, ToggleView, ViewMode } from '@pancakeswap/uikit'
 import { Pool } from '@pancakeswap/widgets-internal'
-import Page from 'components/Layout/Page'
-import { useMemo, useState } from 'react'
-import min from 'lodash/min'
-import max from 'lodash/max'
 import BigNumber from 'bignumber.js'
+import Page from 'components/Layout/Page'
+import max from 'lodash/max'
+import min from 'lodash/min'
+import partition from 'lodash/partition'
+import { useMemo, useState } from 'react'
+import { Address } from 'viem'
 
-import { useStakedPools, useStakedPositionsByUser } from './hooks/useStakedPools'
 import { FixedStakingCard } from './components/FixedStakingCard'
 import FixedStakingRow from './components/FixedStakingRow'
+import { useStakedPools, useStakedPositionsByUser } from './hooks/useStakedPools'
 import { FixedStakingPool } from './type'
 
 const FixedStaking = () => {
@@ -19,7 +22,9 @@ const FixedStaking = () => {
 
   const displayPools = useStakedPools()
 
-  const stakedPositions = useStakedPositionsByUser(displayPools.map((p) => p.poolIndex))
+  const displayPoolsIndex = useMemo(() => displayPools.map((p) => p.poolIndex), [displayPools])
+
+  const stakedPositions = useStakedPositionsByUser(displayPoolsIndex)
 
   // Groupd pools with same token
   const groupPoolsByToken = useMemo<Record<string, FixedStakingPool[]>>(() => {
@@ -60,6 +65,15 @@ const FixedStaking = () => {
     }, {})
   }, [groupPoolsByToken])
 
+  // Put WBNB on top
+  const sortedPoolGroup = useMemo(() => {
+    const [first, last] = partition(Object.keys(poolGroup), (poolAddress) =>
+      [bscTokens.wbnb.address, bscTokens.cake.address].includes(poolAddress as Address),
+    )
+
+    return [...first, ...last]
+  }, [poolGroup])
+
   return (
     <>
       <PageHeader>
@@ -80,7 +94,7 @@ const FixedStaking = () => {
         </Flex>
         {viewMode === ViewMode.TABLE ? (
           <Pool.PoolsTable>
-            {Object.keys(poolGroup).map((key) => (
+            {sortedPoolGroup.map((key) => (
               <FixedStakingRow
                 key={key}
                 stakedPositions={stakedPositions.filter(
@@ -92,7 +106,7 @@ const FixedStaking = () => {
           </Pool.PoolsTable>
         ) : (
           <FlexLayout>
-            {Object.keys(poolGroup).map((key) => (
+            {sortedPoolGroup.map((key) => (
               <FixedStakingCard
                 key={key}
                 pool={poolGroup[key]}

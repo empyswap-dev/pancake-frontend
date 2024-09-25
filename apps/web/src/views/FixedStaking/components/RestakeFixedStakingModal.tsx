@@ -1,17 +1,17 @@
 import { useTranslation } from '@pancakeswap/localization'
-import { ModalV2, useModalV2, Text, Box, PreTitle, Flex, Message, MessageText } from '@pancakeswap/uikit'
-import { ReactNode } from 'react'
-import { CurrencyAmount, Token } from '@pancakeswap/sdk'
+import { Currency, CurrencyAmount } from '@pancakeswap/sdk'
+import { Box, Flex, Message, MessageText, ModalV2, PreTitle, Text, useModalV2 } from '@pancakeswap/uikit'
 import { LightGreyCard } from 'components/Card'
+import { ReactNode } from 'react'
 
 import ConnectWalletButton from 'components/ConnectWalletButton'
 import useAccountActiveChain from 'hooks/useAccountActiveChain'
 
 import { FixedStakingPool, StakedPosition } from '../type'
+import { AmountWithUSDSub } from './AmountWithUSDSub'
+import { FixedStakingCalculator } from './FixedStakingCalculator'
 import FixedStakingOverview from './FixedStakingOverview'
 import { StakingModalTemplate } from './StakingModalTemplate'
-import { FixedStakingCalculator } from './FixedStakingCalculator'
-import { AmountWithUSDSub } from './AmountWithUSDSub'
 import WithdrawalMessage from './WithdrawalMessage'
 
 export function FixedRestakingModal({
@@ -24,13 +24,13 @@ export function FixedRestakingModal({
   amountDeposit,
   stakedPositions,
 }: {
-  stakingToken: Token
+  stakingToken: Currency
   pools: FixedStakingPool[]
   children: (openModal: () => void) => ReactNode
   initialLockPeriod: number
   stakedPeriods: number[]
   setSelectedPeriodIndex?: (value: number | null) => void
-  amountDeposit: CurrencyAmount<Token>
+  amountDeposit: CurrencyAmount<Currency>
   stakedPositions: StakedPosition[]
 }) {
   const { account } = useAccountActiveChain()
@@ -50,6 +50,8 @@ export function FixedRestakingModal({
         closeOnOverlayClick
       >
         <StakingModalTemplate
+          hideStakeButton
+          useNative
           stakedPositions={stakedPositions}
           stakingToken={stakingToken}
           pools={pools}
@@ -72,6 +74,7 @@ export function FixedRestakingModal({
             boostAPR,
             lockAPR,
             lastDayAction,
+            positionStakeCurrencyAmount,
           }) => (
             <>
               <WithdrawalMessage lockPeriod={lockPeriod} />
@@ -87,7 +90,7 @@ export function FixedRestakingModal({
                         <PreTitle mr="4px">{t('New')}</PreTitle>
                         <PreTitle color="textSubtle">{t('Staked Amount')}</PreTitle>
                       </Flex>
-                      <AmountWithUSDSub amount={amountDeposit.add(stakeCurrencyAmount)} />
+                      <AmountWithUSDSub amount={amountDeposit.add(positionStakeCurrencyAmount)} />
                     </Box>
                     <Box style={{ textAlign: 'end' }}>
                       <PreTitle color="textSubtle">{t('Stake Period')}</PreTitle>

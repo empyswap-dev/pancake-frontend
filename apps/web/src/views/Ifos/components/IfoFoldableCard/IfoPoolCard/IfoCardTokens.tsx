@@ -1,37 +1,41 @@
-import { useMemo } from 'react'
+import { Ifo, PoolIds, cakeBnbLpToken } from '@pancakeswap/ifos'
+import { useTranslation } from '@pancakeswap/localization'
+import { Token } from '@pancakeswap/sdk'
+import { bscTokens } from '@pancakeswap/tokens'
 import {
-  Text,
-  Flex,
+  AutoRenewIcon,
+  BalanceWithLoading,
   Box,
+  BunnyPlaceholderIcon,
+  Button,
   CheckmarkCircleIcon,
+  ErrorIcon,
+  Flex,
   FlexProps,
   HelpIcon,
-  useTooltip,
-  Button,
-  AutoRenewIcon,
-  BunnyPlaceholderIcon,
+  IfoPercentageOfTotal,
+  IfoSkeletonCardTokens,
+  IfoVestingAvailableToClaim,
   Message,
   MessageText,
-  ErrorIcon,
-  BalanceWithLoading,
-  IfoSkeletonCardTokens,
-  IfoPercentageOfTotal,
-  IfoVestingAvailableToClaim,
+  Text,
+  useTooltip,
 } from '@pancakeswap/uikit'
-import { useAccount } from 'wagmi'
-import { Token } from '@pancakeswap/sdk'
-import { Ifo, PoolIds } from 'config/constants/types'
-import { bscTokens } from '@pancakeswap/tokens'
-import { cakeBnbLpToken } from 'config/constants/ifo'
-import { PublicIfoData, WalletIfoData } from 'views/Ifos/types'
-import { useTranslation } from '@pancakeswap/localization'
-import { getBalanceNumber, formatNumber } from '@pancakeswap/utils/formatBalance'
-import { useIfoCredit } from 'state/pools/hooks'
+import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
+import { getBalanceAmount, getBalanceNumber } from '@pancakeswap/utils/formatBalance'
+import { NumberDisplay, type NumberDisplayProps } from '@pancakeswap/widgets-internal'
 import { TokenImage, TokenPairImage } from 'components/TokenImage'
-import { EnableStatus } from '../types'
-import IFORequirements from './IFORequirements'
-import { MessageTextLink } from '../../IfoCardStyles'
+import { useActiveChainId } from 'hooks/useActiveChainId'
+import { ReactNode, useMemo } from 'react'
+import { isBasicSale } from 'views/Ifos/hooks/v7/helpers'
+import { PublicIfoData, WalletIfoData } from 'views/Ifos/types'
+import { useAccount } from 'wagmi'
+
+import { TextLink } from '../../IfoCardStyles'
 import StakeVaultButton from '../StakeVaultButton'
+import { EnableStatus } from '../types'
+import { CrossChainVeCakeTips } from './CrossChainVeCakeTips'
+import IFORequirements from './IFORequirements'
 
 interface TokenSectionProps extends FlexProps {
   primaryToken?: Token
@@ -85,7 +89,9 @@ const CommitTokenSection: React.FC<React.PropsWithChildren<TokenSectionProps & {
 
 const Label = (props) => <Text bold fontSize="12px" color="secondary" textTransform="uppercase" {...props} />
 
-const Value = (props) => <Text bold fontSize="20px" style={{ wordBreak: 'break-all' }} {...props} />
+const Value = (props: NumberDisplayProps) => (
+  <NumberDisplay bold fontSize="20px" style={{ wordBreak: 'break-all' }} {...props} />
+)
 
 interface IfoCardTokensProps {
   poolId: PoolIds
@@ -106,11 +112,10 @@ const OnSaleInfo = ({ token, saleAmount, distributionRatio }) => {
     <TokenSection primaryToken={token}>
       <Flex flexDirection="column">
         <Label textTransform="uppercase">{t('On sale')}</Label>
-        <Value>
-          {typeof saleAmount === 'string'
-            ? saleAmount
-            : `${formatNumber(getBalanceNumber(saleAmount), 0, 0)} ${token.symbol}`}
-        </Value>
+        <Value
+          value={typeof saleAmount === 'string' ? saleAmount : getBalanceAmount(saleAmount, token.decimals)}
+          suffix={` ${token.symbol}`}
+        />
         <Text fontSize="14px" color="textSubtle">
           {t('%ratio%% of total sale', { ratio: distributionRatio })}
         </Text>
@@ -133,6 +138,7 @@ const IfoCardTokens: React.FC<React.PropsWithChildren<IfoCardTokensProps>> = ({
 }) => {
   const { address: account } = useAccount()
   const { t } = useTranslation()
+  const { chainId } = useActiveChainId()
   const { targetRef, tooltip, tooltipVisible } = useTooltip(
     t(
       'Sorry, you didn’t contribute enough CAKE to meet the minimum threshold. You didn’t buy anything in this sale, but you can still reclaim your CAKE.',
@@ -141,20 +147,22 @@ const IfoCardTokens: React.FC<React.PropsWithChildren<IfoCardTokensProps>> = ({
   )
 
   const publicPoolCharacteristics = publicIfoData[poolId]
+  const isPublicPoolBasicSale = isBasicSale(publicPoolCharacteristics?.saleType)
   const userPoolCharacteristics = walletIfoData[poolId]
-  const { offeringAmountInToken, amountTokenCommittedInLP, refundingAmountInLP } = userPoolCharacteristics
-  const spentAmount = amountTokenCommittedInLP.minus(refundingAmountInLP)
+  const offeringAmountInToken = userPoolCharacteristics?.offeringAmountInToken
+  const amountTokenCommittedInLP = userPoolCharacteristics?.amountTokenCommittedInLP
+  const refundingAmountInLP = userPoolCharacteristics?.refundingAmountInLP
+  const spentAmount = amountTokenCommittedInLP?.minus(refundingAmountInLP || BIG_ZERO)
 
   const { currency, token, version } = ifo
-  const { hasClaimed } = userPoolCharacteristics
+  const hasClaimed = userPoolCharacteristics?.hasClaimed
   const distributionRatio =
-    (ifo.version >= 3 ? publicIfoData[poolId].distributionRatio : ifo[poolId].distributionRatio) * 100
-  const credit = useIfoCredit()
+    (ifo.version >= 3 ? publicIfoData[poolId]?.distributionRatio ?? 0 : ifo[poolId]?.distributionRatio ?? 0) * 100
 
   const tooltipContentOfSpent = t(
     'Based on "overflow" sales method. %refundingAmount% unspent %spentToken% are available to claim after the sale is completed.',
     {
-      refundingAmount: getBalanceNumber(refundingAmountInLP, ifo.currency.decimals).toFixed(4),
+      refundingAmount: getBalanceNumber(refundingAmountInLP || BIG_ZERO, ifo.currency.decimals).toFixed(4),
       spentToken: ifo.currency.symbol,
     },
   )
@@ -181,29 +189,12 @@ const IfoCardTokens: React.FC<React.PropsWithChildren<IfoCardTokensProps>> = ({
         <OnSaleInfo
           token={token}
           distributionRatio={distributionRatio}
-          saleAmount={ifo.version >= 3 ? publicIfoData[poolId].offeringAmountPool : ifo[poolId].saleAmount}
+          saleAmount={ifo.version >= 3 ? publicIfoData[poolId]?.offeringAmountPool : ifo[poolId]?.saleAmount}
         />
       )
     }
 
-    let message
-
-    if (account && !hasProfile) {
-      message = (
-        <Message my="24px" p="8px" variant="warning">
-          <Box>
-            <MessageText display="inline">
-              {publicIfoData.status === 'finished'
-                ? t('Activate PancakeSwap Profile to take part in next IFO‘s!')
-                : t('You need an active PancakeSwap Profile to take part in an IFO!')}
-            </MessageText>{' '}
-            <MessageTextLink href="/ifo#ifo-how-to" color="#D67E0A" display="inline">
-              {t('How does it work?')} »
-            </MessageTextLink>
-          </Box>
-        </Message>
-      )
-    }
+    let message: ReactNode | undefined
 
     const ifov31Msg =
       ifo.version >= 3.1 && poolId === PoolIds.poolBasic && criterias?.length > 0 ? (
@@ -234,27 +225,24 @@ const IfoCardTokens: React.FC<React.PropsWithChildren<IfoCardTokensProps>> = ({
 
     if (
       (ifo.version === 3 || (ifo.version >= 3.1 && poolId === PoolIds.poolUnlimited)) &&
-      getBalanceNumber(credit) === 0
+      publicIfoData.status !== 'finished' &&
+      hasProfile
     ) {
-      message = (
-        <Message my="24px" p="8px" variant="danger">
-          <Box>
-            <MessageText display="inline">{t('You don’t have any iCAKE available for IFO public sale.')}</MessageText>{' '}
-            <MessageTextLink display="inline" fontWeight={700} href="/ifo#ifo-how-to" color="failure">
-              {t('How does it work?')} »
-            </MessageTextLink>
-          </Box>
-        </Message>
-      )
+      // If Cross-Chain IFO
+      // if (ifo.chainId !== ChainId.BSC) {
+      message = <CrossChainVeCakeTips ifoChainId={ifo.chainId} />
+      // }
+      // Phase this out later, as it applies at the same time
+      // else message = <ICakeTips ifoId={ifo.id} ifoChainId={ifo.chainId} ifoAddress={ifo.address} />
     }
 
-    if (account && !hasProfile) {
+    if (account && !hasProfile && !isPublicPoolBasicSale && publicIfoData.status !== 'finished') {
       return (
         <>
           <OnSaleInfo
             token={token}
             distributionRatio={distributionRatio}
-            saleAmount={ifo.version >= 3 ? publicIfoData[poolId].offeringAmountPool : ifo[poolId].saleAmount}
+            saleAmount={ifo.version >= 3 ? publicIfoData[poolId]?.offeringAmountPool : ifo[poolId]?.saleAmount}
           />
           {message}
         </>
@@ -264,19 +252,20 @@ const IfoCardTokens: React.FC<React.PropsWithChildren<IfoCardTokensProps>> = ({
     message = ifov31Msg || message
 
     if (publicIfoData.status === 'coming_soon') {
+      const offeringAmountPool = publicIfoData[poolId]?.offeringAmountPool
       return (
         <>
           <TokenSection primaryToken={ifo.token}>
             <Label>{t('On sale')}</Label>
-            <Value>{`${formatNumber(getBalanceNumber(publicIfoData[poolId].offeringAmountPool), 0, 0)} ${
-              token.symbol
-            }`}</Value>
+            {offeringAmountPool ? (
+              <Value value={getBalanceAmount(offeringAmountPool, ifo.token.decimals)} suffix={` ${ifo.token.symbol}`} />
+            ) : null}
           </TokenSection>
           <Text fontSize="14px" color="textSubtle" pl="48px">
             {t('%ratio%% of total sale', { ratio: distributionRatio })}
           </Text>
           {message}
-          {enableStatus !== EnableStatus.ENABLED && account && (
+          {enableStatus !== EnableStatus.ENABLED && account && chainId === ifo.chainId && (
             <Button
               width="100%"
               mt="16px"
@@ -293,14 +282,16 @@ const IfoCardTokens: React.FC<React.PropsWithChildren<IfoCardTokensProps>> = ({
     if (publicIfoData.status === 'live') {
       return (
         <>
-          <CommitTokenSection commitToken={ifo.currency} mb="24px">
+          <CommitTokenSection commitToken={ifo.currency} mb="12px">
             <Label>{t('Your %symbol% committed', { symbol: currency.symbol })}</Label>
-            <Value>{getBalanceNumber(amountTokenCommittedInLP, currency.decimals)}</Value>
+            {amountTokenCommittedInLP ? (
+              <Value value={getBalanceAmount(amountTokenCommittedInLP, currency.decimals)} />
+            ) : null}
             <IfoPercentageOfTotal
-              userAmount={amountTokenCommittedInLP}
-              totalAmount={publicPoolCharacteristics.totalAmountPool}
+              userAmount={amountTokenCommittedInLP || BIG_ZERO}
+              totalAmount={publicPoolCharacteristics?.totalAmountPool || BIG_ZERO}
             />
-            <Flex>
+            <Flex mt="8px">
               <Box>
                 <Flex>
                   <Label>{t('Your %symbol% spent', { symbol: currency.symbol })}</Label>
@@ -320,15 +311,17 @@ const IfoCardTokens: React.FC<React.PropsWithChildren<IfoCardTokensProps>> = ({
           </CommitTokenSection>
           <TokenSection primaryToken={ifo.token}>
             <Label>{t('%symbol% to receive', { symbol: token.symbol })}</Label>
-            <Value>{getBalanceNumber(offeringAmountInToken, token.decimals)}</Value>
-            {version >= 3.2 && publicPoolCharacteristics.vestingInformation.percentage > 0 && (
+            {offeringAmountInToken ? <Value value={getBalanceAmount(offeringAmountInToken, token.decimals)} /> : null}
+            {version >= 3.2 &&
+            publicPoolCharacteristics?.vestingInformation?.percentage &&
+            publicPoolCharacteristics.vestingInformation.percentage > 0 ? (
               <IfoVestingAvailableToClaim
-                amountToReceive={offeringAmountInToken}
+                amountToReceive={offeringAmountInToken || BIG_ZERO}
                 percentage={publicPoolCharacteristics.vestingInformation.percentage}
                 decimals={token.decimals}
                 displayDecimals={2}
               />
-            )}
+            ) : null}
           </TokenSection>
           {message}
         </>
@@ -336,21 +329,22 @@ const IfoCardTokens: React.FC<React.PropsWithChildren<IfoCardTokensProps>> = ({
     }
 
     if (publicIfoData.status === 'finished') {
-      return amountTokenCommittedInLP.isEqualTo(0) ? (
+      return amountTokenCommittedInLP?.isEqualTo(0) ? (
         <Flex flexDirection="column" alignItems="center">
           <BunnyPlaceholderIcon width={80} mb="16px" />
           <Text fontWeight={600}>{t('You didn’t participate in this sale!')}</Text>
-          {ifov31Msg || (
-            <>
-              <Text textAlign="center" fontSize="14px">
-                {t('To participate in the next IFO, lock some CAKE in the fixed-term staking CAKE pool!')}
-              </Text>
-              <MessageTextLink href="/ifo#ifo-how-to" textAlign="center">
-                {t('How does it work?')} »
-              </MessageTextLink>
-              <StakeVaultButton mt="24px" />
-            </>
-          )}
+          {!isPublicPoolBasicSale &&
+            (ifov31Msg || (
+              <>
+                <Text textAlign="center" fontSize="14px">
+                  {t('To participate in the next IFO, lock some CAKE in the fixed-term staking CAKE pool!')}
+                </Text>
+                <TextLink href="/ifo#ifo-how-to" textAlign="center">
+                  {t('How does it work?')} »
+                </TextLink>
+                <StakeVaultButton mt="24px" />
+              </>
+            ))}
         </Flex>
       ) : (
         <>
@@ -361,12 +355,12 @@ const IfoCardTokens: React.FC<React.PropsWithChildren<IfoCardTokensProps>> = ({
                 : t('Your %symbol% TO RECLAIM', { symbol: currency.symbol })}
             </Label>
             <Flex alignItems="center">
-              <Value>{getBalanceNumber(refundingAmountInLP, currency.decimals)}</Value>
+              {refundingAmountInLP ? <Value value={getBalanceAmount(refundingAmountInLP, currency.decimals)} /> : null}
               {hasClaimed && <CheckmarkCircleIcon color="success" ml="8px" />}
             </Flex>
             <IfoPercentageOfTotal
-              userAmount={amountTokenCommittedInLP}
-              totalAmount={publicPoolCharacteristics.totalAmountPool}
+              userAmount={amountTokenCommittedInLP || BIG_ZERO}
+              totalAmount={publicPoolCharacteristics?.totalAmountPool || BIG_ZERO}
             />
           </CommitTokenSection>
           <TokenSection primaryToken={ifo.token}>
@@ -377,8 +371,8 @@ const IfoCardTokens: React.FC<React.PropsWithChildren<IfoCardTokensProps>> = ({
                 : t('%symbol% to receive', { symbol: token.symbol })}
             </Label>
             <Flex alignItems="center">
-              <Value>{getBalanceNumber(offeringAmountInToken, token.decimals)}</Value>
-              {!hasClaimed && offeringAmountInToken.isEqualTo(0) && (
+              {offeringAmountInToken ? <Value value={getBalanceAmount(offeringAmountInToken, token.decimals)} /> : null}
+              {!hasClaimed && offeringAmountInToken?.isEqualTo(0) && (
                 <div ref={targetRef} style={{ display: 'flex', marginLeft: '8px' }}>
                   <HelpIcon />
                 </div>

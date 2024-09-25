@@ -23,7 +23,7 @@ export const getTimeWindowChange = (lineChartData) => {
   }
 }
 
-export const getTokenAddress = (chainId: number, tokenAddress: undefined | string) => {
+export const getTokenAddress = (chainId: number | undefined, tokenAddress: string | undefined) => {
   if (!tokenAddress || !chainId) {
     return ''
   }
@@ -31,7 +31,7 @@ export const getTokenAddress = (chainId: number, tokenAddress: undefined | strin
   const nativeToken = NATIVE[chainId]
   const nativeSymbol = nativeToken?.symbol?.toLowerCase() || ''
   if (lowerCaseAddress === nativeSymbol) {
-    return WNATIVE[chainId].address
+    return WNATIVE[chainId].address.toLowerCase()
   }
 
   return lowerCaseAddress

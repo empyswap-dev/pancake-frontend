@@ -1,10 +1,10 @@
-import useSWR from 'swr'
+import { useQuery } from '@tanstack/react-query'
 import { useActiveChainId } from 'hooks/useActiveChainId'
 import { useLiquidStakingList } from 'views/LiquidStaking/hooks/useLiquidStakingList'
 
 interface UseLiquidStakingAprDetail {
   apr: number
-  contract: string
+  contract: `0x${string}`
   stakingSymbol: string
 }
 
@@ -18,38 +18,45 @@ export const useLiquidStakingApr = (): UseLiquidStakingAprType => {
   const { chainId } = useActiveChainId()
   const { data: liquidStakingList } = useLiquidStakingList()
 
-  const { data, isLoading, mutate } = useSWR(
-    liquidStakingList?.length && ['liquid-staking-apr', chainId, liquidStakingList],
-    async () => {
-      try {
-        const result = await Promise.all(
-          liquidStakingList.map(async (i) => {
-            let apr = null
-            const { data: responseData } = await fetch(i.aprUrl).then((res) => res.json())
+  const { data, isPending, refetch } = useQuery({
+    queryKey: ['liquidStaking', 'liquid-staking-apr', chainId],
 
-            if (responseData?.annualInterestRate) {
-              apr = responseData.annualInterestRate * 100
-            }
+    queryFn: async () => {
+      const result = await Promise.allSettled(
+        liquidStakingList.map(async (i) => {
+          let apr: number | null = null
+          const { data: responseData } = await fetch(i.aprUrl).then((res) => res.json())
 
-            return {
-              apr,
-              contract: i.contract,
-              stakingSymbol: i.stakingSymbol,
-            }
-          }),
-        )
+          if (responseData?.annualInterestRate) {
+            apr = responseData.annualInterestRate * 100
+          } else if (responseData?.apr) {
+            apr = responseData.apr * 100
+          }
 
-        return result as UseLiquidStakingAprDetail[]
-      } catch (error) {
-        console.error('Cannot get liquid staking apr: ', error)
-        return []
-      }
+          if (!apr) {
+            throw new Error('Unknown apr')
+          }
+
+          return {
+            apr,
+            contract: i.contract,
+            stakingSymbol: i.stakingSymbol,
+          }
+        }),
+      )
+
+      const results = result
+        .filter((res): res is PromiseFulfilledResult<UseLiquidStakingAprDetail> => res.status === 'fulfilled')
+        .map((res) => res.value)
+      return results
     },
-  )
+
+    enabled: Boolean(liquidStakingList?.length),
+  })
 
   return {
-    isFetching: isLoading,
+    isFetching: isPending,
     aprs: data ?? [],
-    refresh: mutate,
+    refresh: refetch,
   }
 }

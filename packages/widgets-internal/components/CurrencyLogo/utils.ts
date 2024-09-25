@@ -1,8 +1,9 @@
-import { getAddress } from "viem";
-import memoize from "lodash/memoize";
-import { Token, Currency, NATIVE } from "@pancakeswap/sdk";
 import { ChainId } from "@pancakeswap/chains";
-import { ethereumTokens, bscTokens } from "@pancakeswap/tokens";
+import { Currency, NATIVE, Token } from "@pancakeswap/sdk";
+import { bscTokens, ethereumTokens } from "@pancakeswap/tokens";
+import memoize from "lodash/memoize";
+import { getAddress } from "viem";
+import { CurrencyInfo } from "./types";
 
 const mapping: { [key: number]: string } = {
   [ChainId.BSC]: "smartchain",
@@ -39,11 +40,11 @@ export const getTokenLogoURLByAddress = memoize(
   (address, chainId) => `${chainId}#${address}`
 );
 
-const chainName: { [key: number]: string } = {
+export const chainName: { [key: number]: string } = {
   [ChainId.BSC]: "",
   [ChainId.ETHEREUM]: "eth",
   [ChainId.POLYGON_ZKEVM]: "polygon-zkevm",
-  [ChainId.ARBITRUM_ONE]: "arb",
+  [ChainId.ARBITRUM_ONE]: "arbitrum",
   [ChainId.ZKSYNC]: "zksync",
   [ChainId.LINEA]: "linea",
   [ChainId.BASE]: "base",
@@ -54,8 +55,8 @@ const chainName: { [key: number]: string } = {
 export const getTokenListBaseURL = (chainId: number) =>
   `https://tokens.pancakeswap.finance/images/${chainName[chainId]}`;
 
-export const getTokenListTokenUrl = (token: Token) =>
-  chainName[token.chainId]
+export const getTokenListTokenUrl = (token: Pick<Token, "chainId" | "address">) =>
+  Object.keys(chainName).includes(String(token.chainId))
     ? `https://tokens.pancakeswap.finance/images/${
         token.chainId === ChainId.BSC ? "" : `${chainName[token.chainId]}/`
       }${token.address}.png`
@@ -65,6 +66,7 @@ const commonCurrencySymbols = [
   ethereumTokens.usdt,
   ethereumTokens.usdc,
   bscTokens.cake,
+  bscTokens.usdv,
   ethereumTokens.wbtc,
   ethereumTokens.weth,
   NATIVE[ChainId.BSC],
@@ -85,11 +87,34 @@ export const getCommonCurrencyUrlBySymbol = memoize(
   (symbol?: string) => `logoUrls#symbol#${symbol}`
 );
 
+type GetLogoUrlsOptions = {
+  useTrustWallet?: boolean;
+};
+
 export const getCurrencyLogoUrls = memoize(
-  (currency?: Currency): string[] => {
+  (currency: Currency | undefined, { useTrustWallet = true }: GetLogoUrlsOptions = {}): string[] => {
     const trustWalletLogo = getTokenLogoURL(currency?.wrapped);
     const logoUrl = currency ? getTokenListTokenUrl(currency.wrapped) : null;
-    return [getCommonCurrencyUrl(currency), trustWalletLogo, logoUrl].filter((url): url is string => !!url);
+    return [getCommonCurrencyUrl(currency), useTrustWallet ? trustWalletLogo : undefined, logoUrl].filter(
+      (url): url is string => !!url
+    );
   },
-  (currency?: Currency) => `logoUrls#${currency?.chainId}#${currency?.wrapped?.address}`
+  (currency: Currency | undefined, options?: GetLogoUrlsOptions) =>
+    `logoUrls#${currency?.chainId}#${currency?.wrapped?.address}#${options ? JSON.stringify(options) : ""}`
+);
+
+export const getCurrencyLogoUrlsByInfo = memoize(
+  (currency: CurrencyInfo | undefined, { useTrustWallet = true }: GetLogoUrlsOptions = {}): string[] => {
+    if (!currency) {
+      return [];
+    }
+    const { chainId, address, symbol } = currency;
+    const trustWalletLogo = getTokenLogoURLByAddress(address, chainId);
+    const logoUrl = chainId && address ? getTokenListTokenUrl({ chainId, address }) : null;
+    return [getCommonCurrencyUrlBySymbol(symbol), useTrustWallet ? trustWalletLogo : undefined, logoUrl].filter(
+      (url): url is string => !!url
+    );
+  },
+  (currency, options) =>
+    `logoUrls#${currency?.chainId}#${currency?.symbol}#${currency?.address}#${options ? JSON.stringify(options) : ""}`
 );

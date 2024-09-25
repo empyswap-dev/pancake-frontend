@@ -1,10 +1,11 @@
 import { useTranslation } from '@pancakeswap/localization'
 import { Currency, CurrencyAmount, Price, Trade, TradeType } from '@pancakeswap/sdk'
-import { CAKE, USDC, USDT, STABLE_COIN } from '@pancakeswap/tokens'
+import { CAKE, STABLE_COIN, USDC, USDT } from '@pancakeswap/tokens'
 import tryParseAmount from '@pancakeswap/utils/tryParseAmount'
 import { useUserSlippage } from '@pancakeswap/utils/user'
-import { SLOW_INTERVAL } from 'config/constants'
+import { useQuery } from '@tanstack/react-query'
 import { DEFAULT_INPUT_CURRENCY } from 'config/constants/exchange'
+import dayjs from 'dayjs'
 import { useTradeExactIn, useTradeExactOut } from 'hooks/Trades'
 import { useActiveChainId } from 'hooks/useActiveChainId'
 import { useBestAMMTrade } from 'hooks/useBestAMMTrade'
@@ -13,18 +14,16 @@ import useNativeCurrency from 'hooks/useNativeCurrency'
 import { useAtom, useAtomValue } from 'jotai'
 import { useRouter } from 'next/router'
 import { ParsedUrlQuery } from 'querystring'
-import { useEffect, useMemo, useState } from 'react'
-import useSWRImmutable from 'swr/immutable'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ChartPeriod, chainIdToExplorerInfoChainName, explorerApiClient } from 'state/info/api/client'
 import { safeGetAddress } from 'utils'
 import { computeSlippageAdjustedAmounts } from 'utils/exchange'
 import { getTokenAddress } from 'views/Swap/components/Chart/utils'
 import { useAccount } from 'wagmi'
+import { PairDataTimeWindowEnum } from '@pancakeswap/uikit'
 import { useCurrencyBalances } from '../wallet/hooks'
 import { Field, replaceSwapState } from './actions'
-import fetchDerivedPriceData, { getTokenBestTvlProtocol } from './fetch/fetchDerivedPriceData'
-import { normalizeDerivedChartData, normalizeDerivedPairDataByActiveToken } from './normalizers'
 import { SwapState, swapReducerAtom } from './reducer'
-import { PairDataTimeWindowEnum } from './types'
 
 export function useSwapState() {
   return useAtomValue(swapReducerAtom)
@@ -52,9 +51,10 @@ function involvesAddress(trade: Trade<Currency, Currency, TradeType>, checksumme
 // Get swap price for single token disregarding slippage and price impact
 export function useSingleTokenSwapInfo(
   inputCurrencyId: string | undefined,
-  inputCurrency: Currency | undefined,
+  inputCurrency: Currency | undefined | null,
   outputCurrencyId: string | undefined,
-  outputCurrency: Currency | undefined,
+  outputCurrency: Currency | undefined | null,
+  enabled = true,
 ): { [key: string]: number } {
   const { chainId } = useActiveChainId()
   const token0Address = useMemo(() => getTokenAddress(chainId, inputCurrencyId), [chainId, inputCurrencyId])
@@ -71,11 +71,12 @@ export function useSingleTokenSwapInfo(
     v2Swap: true,
     v3Swap: true,
     stableSwap: true,
-    type: 'api',
+    type: 'quoter',
     autoRevalidate: false,
+    enabled,
   })
   if (!inputCurrency || !outputCurrency || !bestTradeExactIn) {
-    return null
+    return {}
   }
 
   let inputTokenPrice = 0
@@ -90,7 +91,7 @@ export function useSingleTokenSwapInfo(
     //
   }
   if (!inputTokenPrice) {
-    return null
+    return {}
   }
   const outputTokenPrice = 1 / inputTokenPrice
 
@@ -290,68 +291,75 @@ type useFetchPairPricesParams = {
   }
 }
 
-export const useFetchPairPricesV3 = ({
+const timeWindowToPeriod = (timeWindow: PairDataTimeWindowEnum): ChartPeriod => {
+  switch (timeWindow) {
+    case PairDataTimeWindowEnum.HOUR:
+      return '1H'
+    case PairDataTimeWindowEnum.DAY:
+      return '1D'
+    case PairDataTimeWindowEnum.WEEK:
+      return '1W'
+    case PairDataTimeWindowEnum.MONTH:
+      return '1M'
+    case PairDataTimeWindowEnum.YEAR:
+      return '1Y'
+    default:
+      throw new Error('Invalid time window')
+  }
+}
+
+export const usePairRate = ({
   token0Address,
   token1Address,
   timeWindow,
   currentSwapPrice,
 }: useFetchPairPricesParams) => {
   const { chainId } = useActiveChainId()
-  const { data: protocol0 } = useSWRImmutable(
-    token0Address && chainId && ['protocol', token0Address, chainId],
-    async () => {
-      return getTokenBestTvlProtocol(token0Address, chainId)
-    },
-  )
-  const { data: protocol1 } = useSWRImmutable(
-    token1Address && chainId && ['protocol', token1Address, chainId],
-    async () => {
-      return getTokenBestTvlProtocol(token0Address, chainId)
-    },
-  )
 
-  const {
-    data: normalizedDerivedPairData,
-    error,
-    isLoading,
-  } = useSWRImmutable(
-    protocol0 &&
-      protocol1 &&
-      token0Address &&
-      chainId &&
-      token1Address && ['derivedPrice', { token0Address, token1Address, chainId, protocol0, protocol1, timeWindow }],
-    async () => {
-      const data = await fetchDerivedPriceData(
-        token0Address,
-        token1Address,
-        timeWindow,
-        protocol0 ?? 'v3',
-        protocol1 ?? 'v3',
-        chainId,
-      )
-      return normalizeDerivedPairDataByActiveToken({
-        activeToken: token0Address,
-        pairData: normalizeDerivedChartData(data),
-      })
-    },
-    {
-      dedupingInterval: SLOW_INTERVAL,
-      refreshInterval: SLOW_INTERVAL,
-    },
-  )
+  const chainName = chainIdToExplorerInfoChainName[chainId]
 
-  const hasSwapPrice = currentSwapPrice && currentSwapPrice[token0Address] > 0
-  const normalizedDerivedPairDataWithCurrentSwapPrice = useMemo(
-    () =>
-      normalizedDerivedPairData?.length > 0 && hasSwapPrice
-        ? [...normalizedDerivedPairData, { time: new Date(), value: currentSwapPrice[token0Address] }]
-        : normalizedDerivedPairData,
-    [currentSwapPrice, hasSwapPrice, normalizedDerivedPairData, token0Address],
-  )
+  return useQuery({
+    queryKey: ['pair-rate', { token0Address, token1Address, chainId, timeWindow }],
+    enabled: Boolean(token0Address && token1Address && chainId && chainName),
+    queryFn: async ({ signal }) => {
+      return explorerApiClient
+        .GET('/cached/tokens/chart/{chainName}/rate', {
+          signal,
+          params: {
+            path: {
+              chainName,
+            },
 
-  return {
-    data: normalizedDerivedPairDataWithCurrentSwapPrice,
-    error,
-    isLoading,
-  }
+            query: {
+              period: timeWindowToPeriod(timeWindow),
+              tokenA: token0Address,
+              tokenB: token1Address,
+            },
+          },
+        })
+        .then((res) => res.data)
+    },
+    select: useCallback(
+      (data_) => {
+        if (!data_) {
+          throw new Error('No data')
+        }
+        const hasSwapPrice = currentSwapPrice && currentSwapPrice[token0Address] > 0
+
+        const formatted = data_.map((d) => ({
+          time: dayjs(d.bucket as string).toDate(),
+          open: d.open ? +d.open : 0,
+          close: d.close ? +d.close : 0,
+          low: d.low ? +d.low : 0,
+          high: d.high ? +d.high : 0,
+          value: d.close ? +d.close : 0,
+        }))
+        if (hasSwapPrice) {
+          return [...formatted, { time: new Date(), value: currentSwapPrice[token0Address] }]
+        }
+        return formatted
+      },
+      [currentSwapPrice, token0Address],
+    ),
+  })
 }

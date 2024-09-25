@@ -1,12 +1,11 @@
+import { ChainId, getLlamaChainName } from '@pancakeswap/chains'
 import { Currency, Token } from '@pancakeswap/sdk'
-import { ChainId } from '@pancakeswap/chains'
 import { gql } from 'graphql-request'
-import { getAddress, Address } from 'viem'
+import { Address, getAddress } from 'viem'
 
+import { withFallback } from '../../utils/withFallback'
 import { getCheckAgainstBaseTokens } from '../functions'
 import { SubgraphProvider } from '../types'
-import { CHAIN_ID_TO_CHAIN_NAME } from '../../constants'
-import { withFallback } from '../../utils/withFallback'
 
 const tokenPriceQuery = gql`
   query getTokens($pageSize: Int!, $tokenAddrs: [ID!]) {
@@ -105,8 +104,8 @@ const createGetTokenPriceFromLlmaWithCache = ({
   const cache = new Map<string, TokenUsdPrice>()
 
   return async ({ addresses, chainId }) => {
-    if (!chainId || !CHAIN_ID_TO_CHAIN_NAME[chainId as keyof typeof CHAIN_ID_TO_CHAIN_NAME]) {
-      throw new Error(`Invalid chain id ${chainId}`)
+    if (!chainId || !getLlamaChainName(chainId)) {
+      return []
     }
     const [cachedResults, addressesToFetch] = addresses.reduce<[TokenUsdPrice[], string[]]>(
       ([cachedAddrs, newAddrs], address) => {
@@ -126,10 +125,7 @@ const createGetTokenPriceFromLlmaWithCache = ({
     }
 
     const list = addressesToFetch
-      .map(
-        (address) =>
-          `${CHAIN_ID_TO_CHAIN_NAME[chainId as keyof typeof CHAIN_ID_TO_CHAIN_NAME]}:${address.toLocaleLowerCase()}`,
-      )
+      .map((address) => `${getLlamaChainName(chainId)}:${address.toLocaleLowerCase()}`)
       .join(',')
     const result: { coins?: { [key: string]: { price: string } } } = await fetch(`${endpoint}/${list}`).then((res) =>
       res.json(),
@@ -156,7 +152,7 @@ export const getCommonTokenPricesByLlma = createCommonTokenPriceProvider<BySubgr
 
 export const getCommonTokenPricesByWalletApi = createCommonTokenPriceProvider<BySubgraphEssentials>(
   createGetTokenPriceFromLlmaWithCache({
-    endpoint: 'https://alpha.wallet-api.pancakeswap.com/v0/prices',
+    endpoint: 'https://wallet-api.pancakeswap.com/v1/prices',
   }),
 )
 

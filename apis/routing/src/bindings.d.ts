@@ -6,7 +6,8 @@ declare global {
   const GOERLI_NODE: string
   const BSC_NODE: string
   const BSC_TESTNET_NODE: string
-  const AXIOM_TOKEN: string
+  const NODE_REAL_SUBGRAPH_API_KEY: string
+  const THE_GRAPH_API_KEY: string
 
   const SUBGRAPH_POOLS: R2Bucket
 }

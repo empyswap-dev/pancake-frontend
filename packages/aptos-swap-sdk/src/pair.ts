@@ -13,11 +13,22 @@ import {
   sqrt,
   MINIMUM_LIQUIDITY,
 } from '@pancakeswap/swap-sdk-core'
-import { TypeTagParser, TxnBuilderTypes, HexString } from 'aptos'
+import { TypeTagStruct, parseTypeTag } from '@aptos-labs/ts-sdk'
 
+import { HexString } from './hexString'
 import { Currency } from './currency'
 import { PAIR_LP_TYPE_TAG, PAIR_RESERVE_TYPE_TAG } from './constants'
 import { Coin } from './coin'
+
+const typeArgToAddress = (typeArg: TypeTagStruct): string => {
+  const children = typeArg.value.typeArgs
+    .filter((ta): ta is TypeTagStruct => ta.isStruct())
+    .map((ta) => typeArgToAddress(ta))
+
+  return `${HexString.fromUint8Array(typeArg.value.address.data).toShortString()}::${
+    typeArg.value.moduleName.identifier
+  }::${typeArg.value.name.identifier}${children.length > 0 ? `<${children.join(', ')}>` : ''}`
+}
 
 export class Pair {
   public readonly liquidityToken: Coin
@@ -42,25 +53,15 @@ export class Pair {
   }
 
   public static parseType(type: string) {
-    const parsedTypeTag = new TypeTagParser(type).parseTypeTag()
-    invariant(parsedTypeTag instanceof TxnBuilderTypes.TypeTagStruct, `Pair type: ${type}`)
-    invariant(parsedTypeTag.value.type_args.length === 2, `Pair type length`)
+    const parsedTypeTag = parseTypeTag(type)
+    invariant(parsedTypeTag.isStruct(), `Pair type: ${type}`)
+    invariant(parsedTypeTag.value.typeArgs.length === 2, `Pair type length`)
 
-    const [typeArg0, tyepArg1] = parsedTypeTag.value.type_args
+    const [typeArg0, typeArg1] = parsedTypeTag.value.typeArgs
 
-    invariant(
-      typeArg0 instanceof TxnBuilderTypes.TypeTagStruct && tyepArg1 instanceof TxnBuilderTypes.TypeTagStruct,
-      'type args'
-    )
+    invariant(typeArg0.isStruct() && typeArg1.isStruct(), 'type args')
 
-    const [address0, address1] = [
-      `${HexString.fromUint8Array(typeArg0.value.address.address).toShortString()}::${
-        typeArg0.value.module_name.value
-      }::${typeArg0.value.name.value}`,
-      `${HexString.fromUint8Array(tyepArg1.value.address.address).toShortString()}::${
-        tyepArg1.value.module_name.value
-      }::${tyepArg1.value.name.value}`,
-    ]
+    const [address0, address1] = [typeArgToAddress(typeArg0), typeArgToAddress(typeArg1)]
 
     return [address0, address1] as const
   }

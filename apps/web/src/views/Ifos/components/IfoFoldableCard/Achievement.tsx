@@ -1,25 +1,28 @@
-import { styled } from 'styled-components'
+import { ChainId } from '@pancakeswap/chains'
+import { Ifo } from '@pancakeswap/ifos'
+import { useTranslation } from '@pancakeswap/localization'
+import { bscTokens } from '@pancakeswap/tokens'
 import {
+  Box,
   Flex,
+  FlexGap,
   Image,
-  Text,
+  LanguageIcon,
+  Link,
   PrizeIcon,
   Skeleton,
-  LanguageIcon,
-  SvgProps,
   Svg,
-  TwitterIcon,
-  Link,
+  SvgProps,
   TelegramIcon,
-  FlexGap,
+  Text,
+  TwitterIcon,
 } from '@pancakeswap/uikit'
-import { bscTokens } from '@pancakeswap/tokens'
-import { useTranslation } from '@pancakeswap/localization'
-import { PublicIfoData } from 'views/Ifos/types'
-import { Ifo } from 'config/constants/types'
 import { BIG_TEN } from '@pancakeswap/utils/bigNumber'
-import { getBlockExploreLink } from 'utils'
 import { formatBigInt } from '@pancakeswap/utils/formatBalance'
+import { ASSET_CDN } from 'config/constants/endpoints'
+import { styled } from 'styled-components'
+import { getBlockExploreLink } from 'utils'
+import { PublicIfoData } from 'views/Ifos/types'
 
 const SmartContractIcon: React.FC<React.PropsWithChildren<SvgProps>> = (props) => {
   return (
@@ -84,6 +87,22 @@ const InlinePrize = styled(Flex)`
   vertical-align: top;
 `
 
+const DescriptionText = styled(Text)`
+  a {
+    font-weight: 600;
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`
+
+const textFormatter = (text: string) => {
+  if (!text) {
+    return ''
+  }
+  return text
+    .replace(/\[(.*)\]\((.*)\)/, `<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>`)
+    .replace(/\\n/, '\n')
+}
+
 const IfoAchievement: React.FC<React.PropsWithChildren<Props>> = ({ ifo, publicIfoData }) => {
   const { t } = useTranslation()
   const tokenName = ifo.token.symbol?.toLowerCase()
@@ -95,39 +114,69 @@ const IfoAchievement: React.FC<React.PropsWithChildren<Props>> = ({ ifo, publicI
 
   return (
     <Container p="16px" pb="32px">
-      <AchievementFlex isFinished={publicIfoData.status === 'finished'} alignItems="flex-start" flex={1}>
-        <Image
-          src={`/images/achievements/ifo-${tokenName}.svg`}
-          fallbackSrc="/images/achievements/ifo-placeholder-bun.png"
-          width={56}
-          height={56}
-          mr="8px"
-        />
-        <Flex flexDirection="column" ml="8px">
-          <Text color="secondary" fontSize="12px">
-            {`${t('Achievement')}:`}
-          </Text>
-          <Flex>
-            <Text bold mr="8px" lineHeight={1.2}>
-              {t('IFO Shopper: %title%', { title: campaignTitle })}
-              <InlinePrize alignItems="center" ml="8px">
-                <PrizeIcon color="textSubtle" width="16px" mr="4px" />
-                <Text lineHeight={1.2} color="textSubtle">
-                  {publicIfoData.numberPoints}
-                </Text>
-              </InlinePrize>
+      {ifo.chainId === ChainId.BSC ? (
+        <AchievementFlex isFinished={publicIfoData.status === 'finished'} alignItems="flex-start" flex={1}>
+          <Image
+            src={`${ASSET_CDN}/web/achievements/ifo-${tokenName}.svg`}
+            fallbackSrc={`${ASSET_CDN}/web/achievements/ifo-placeholder-bun.png`}
+            width={56}
+            height={56}
+            mr="8px"
+          />
+          <Flex flexDirection="column" ml="8px">
+            <Text color="secondary" fontSize="12px">
+              {`${t('Achievement')}:`}
             </Text>
+            <Flex>
+              <Text bold mr="8px" lineHeight={1.2}>
+                {t('IFO Shopper: %title%', { title: campaignTitle })}
+                <InlinePrize alignItems="center" ml="8px">
+                  <PrizeIcon color="textSubtle" width="16px" mr="4px" />
+                  <Text lineHeight={1.2} color="textSubtle">
+                    {publicIfoData.numberPoints}
+                  </Text>
+                </InlinePrize>
+              </Text>
+            </Flex>
+            {publicIfoData.currencyPriceInUSD.gt(0) ? (
+              <Text color="textSubtle" fontSize="12px">
+                {t('Commit ~%amount% %symbol% in total to earn!', {
+                  amount: minLpForAchievement,
+                  symbol: ifo.currency === bscTokens.cake ? 'CAKE' : 'LP',
+                })}
+              </Text>
+            ) : (
+              <Skeleton minHeight={18} width={80} />
+            )}
+            <FlexGap gap="16px" pt="24px" pl="4px">
+              <Link external href={projectUrl}>
+                <LanguageIcon color="textSubtle" />
+              </Link>
+              <Link external href={ifo.articleUrl}>
+                <ProposalIcon color="textSubtle" />
+              </Link>
+              <Link external href={getBlockExploreLink(ifo.address, 'address', ifo.chainId)}>
+                <SmartContractIcon color="textSubtle" />
+              </Link>
+              {ifo.twitterUrl && (
+                <Link external href={ifo.twitterUrl}>
+                  <TwitterIcon color="textSubtle" />
+                </Link>
+              )}
+              {ifo.telegramUrl && (
+                <Link external href={ifo.telegramUrl}>
+                  <TelegramIcon color="textSubtle" />
+                </Link>
+              )}
+            </FlexGap>
           </Flex>
-          {publicIfoData.currencyPriceInUSD.gt(0) ? (
-            <Text color="textSubtle" fontSize="12px">
-              {t('Commit ~%amount% %symbol% in total to earn!', {
-                amount: minLpForAchievement,
-                symbol: ifo.currency === bscTokens.cake ? 'CAKE' : 'LP',
-              })}
-            </Text>
-          ) : (
-            <Skeleton minHeight={18} width={80} />
-          )}
+        </AchievementFlex>
+      ) : (
+        <Box ml="8px">
+          <Text color="secondary" fontSize="12px">
+            {`${t('IFO')}`}
+          </Text>
+          <Text bold>{campaignTitle}</Text>
           <FlexGap gap="16px" pt="24px" pl="4px">
             <Link external href={projectUrl}>
               <LanguageIcon color="textSubtle" />
@@ -135,7 +184,7 @@ const IfoAchievement: React.FC<React.PropsWithChildren<Props>> = ({ ifo, publicI
             <Link external href={ifo.articleUrl}>
               <ProposalIcon color="textSubtle" />
             </Link>
-            <Link external href={getBlockExploreLink(ifo.address, 'address')}>
+            <Link external href={getBlockExploreLink(ifo.address, 'address', ifo.chainId)}>
               <SmartContractIcon color="textSubtle" />
             </Link>
             {ifo.twitterUrl && (
@@ -149,13 +198,16 @@ const IfoAchievement: React.FC<React.PropsWithChildren<Props>> = ({ ifo, publicI
               </Link>
             )}
           </FlexGap>
-        </Flex>
-      </AchievementFlex>
+        </Box>
+      )}
       {ifo.description && (
         <Flex alignItems="flex-end" flexDirection="column" flex={1}>
-          <Text fontSize="14px" lineHeight={1.2} style={{ whiteSpace: 'pre-line' }}>
-            {ifo.description}
-          </Text>
+          <DescriptionText
+            fontSize="14px"
+            lineHeight={1.2}
+            style={{ whiteSpace: 'pre-line' }}
+            dangerouslySetInnerHTML={{ __html: textFormatter(ifo.description) }}
+          />
         </Flex>
       )}
     </Container>

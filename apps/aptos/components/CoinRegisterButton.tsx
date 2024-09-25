@@ -12,7 +12,7 @@ export function CoinRegisterButton({ currency }: { currency: Currency }) {
     trigger: 'hover',
   })
 
-  const { sendTransactionAsync, isLoading } = useSendTransaction()
+  const { sendTransactionAsync, isPending } = useSendTransaction()
   const { fetchWithCatchTxError, loading } = useCatchTxError()
   const { toastSuccess } = useToast()
 
@@ -25,9 +25,8 @@ export function CoinRegisterButton({ currency }: { currency: Currency }) {
             fetchWithCatchTxError(() =>
               sendTransactionAsync({
                 payload: {
-                  type: 'entry_function_payload',
-                  type_arguments: [currency.address],
-                  arguments: [],
+                  typeArguments: [currency.address],
+                  functionArguments: [],
                   function: `0x1::managed_coin::register`,
                 },
               }),
@@ -39,7 +38,7 @@ export function CoinRegisterButton({ currency }: { currency: Currency }) {
           style={{ width: 'auto' }}
           scale="sm"
         >
-          {!isLoading && !loading ? <WalletRegisterIcon color="textSubtle" /> : <Loading width="16px" height="16px" />}
+          {!isPending && !loading ? <WalletRegisterIcon color="textSubtle" /> : <Loading width="16px" height="16px" />}
         </IconButton>
       </div>
       {tooltipVisible && tooltip}

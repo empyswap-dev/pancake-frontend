@@ -1,13 +1,15 @@
-import { styled } from 'styled-components'
-import { ModalBody, ModalContainer, Message, ModalHeader, Box, Heading } from '@pancakeswap/uikit'
-import useTheme from 'hooks/useTheme'
+import { ChainId } from '@pancakeswap/chains'
 import { useTranslation } from '@pancakeswap/localization'
 import { WrappedTokenInfo } from '@pancakeswap/token-lists'
-import { ChainId } from '@pancakeswap/chains'
+import { Acknowledgement, Box, Heading, Message, ModalBody, ModalContainer, ModalHeader } from '@pancakeswap/uikit'
 import { useActiveChainId } from 'hooks/useActiveChainId'
-import ETH_WARNING_LIST from './1'
-import BSC_WARNING_LIST from './56'
-import Acknowledgement from './Acknowledgement'
+import useTheme from 'hooks/useTheme'
+import { styled } from 'styled-components'
+import ARB_WARNING_LIST from './arbitrum'
+import BASE_WARNING_LIST from './base'
+import BSC_WARNING_LIST from './bsc'
+import ETH_WARNING_LIST from './mainnet'
+import ZKSYNC_WARNING_LIST from './zksync'
 
 const StyledModalContainer = styled(ModalContainer)`
   max-width: 440px;
@@ -31,9 +33,12 @@ const SwapWarningModal: React.FC<React.PropsWithChildren<SwapWarningModalProps>>
   const TOKEN_WARNINGS = {
     [ChainId.ETHEREUM]: ETH_WARNING_LIST,
     [ChainId.BSC]: BSC_WARNING_LIST,
+    [ChainId.ZKSYNC]: ZKSYNC_WARNING_LIST,
+    [ChainId.BASE]: BASE_WARNING_LIST,
+    [ChainId.ARBITRUM_ONE]: ARB_WARNING_LIST,
   }
 
-  const SWAP_WARNING = TOKEN_WARNINGS?.[chainId]?.[swapCurrency.address]
+  const SWAP_WARNING = chainId ? TOKEN_WARNINGS?.[chainId]?.[swapCurrency.address] : undefined
 
   return (
     <StyledModalContainer minWidth="280px">

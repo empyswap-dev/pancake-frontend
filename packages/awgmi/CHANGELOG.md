@@ -1,5 +1,29 @@
 # @pancakeswap/awgmi
 
+## 1.0.1
+
+### Patch Changes
+
+- 72c834c: Upgrade viem and wagmi v2
+
+## 1.0.0
+
+### Major Changes
+
+- f9a2752c9: Update react query v5
+
+## 0.2.1
+
+### Patch Changes
+
+- e73d4ded3: use new msafe aptos sdk
+
+## 0.2.0
+
+### Minor Changes
+
+- 2a684051f: Add msafe connector
+
 ## 0.1.15
 
 ### Patch Changes

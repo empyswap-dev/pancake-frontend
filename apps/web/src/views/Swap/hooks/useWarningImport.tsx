@@ -2,8 +2,8 @@ import { Token } from '@pancakeswap/sdk'
 import { useModal } from '@pancakeswap/uikit'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/router'
-import useSWRImmutable from 'swr/immutable'
 import shouldShowSwapWarning from 'utils/shouldShowSwapWarning'
 
 import ImportTokenWarningModal from 'components/ImportTokenWarningModal'
@@ -24,19 +24,21 @@ export default function useWarningImport() {
   } = useSwapState()
 
   // swap warning state
-  const [swapWarningCurrency, setSwapWarningCurrency] = useState(null)
+  const [swapWarningCurrency, setSwapWarningCurrency] = useState<any>(null)
 
   // token warning stuff
   const [loadedInputCurrency, loadedOutputCurrency] = [useCurrency(inputCurrencyId), useCurrency(outputCurrencyId)]
 
   const urlLoadedTokens: Token[] = useMemo(
-    () => [loadedInputCurrency, loadedOutputCurrency]?.filter((c): c is Token => c?.isToken) ?? [],
+    () => [loadedInputCurrency, loadedOutputCurrency]?.filter((c): c is Token => Boolean(c?.isToken)) ?? [],
     [loadedInputCurrency, loadedOutputCurrency],
   )
 
   const defaultTokens = useAllTokens()
 
-  const { data: loadedTokenList } = useSWRImmutable(['token-list'])
+  const { data: loadedTokenList } = useQuery({
+    queryKey: ['token-list'],
+  })
 
   const importTokensNotInDefault = useMemo(() => {
     return !isWrongNetwork && urlLoadedTokens && !!loadedTokenList

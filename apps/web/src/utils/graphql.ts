@@ -1,37 +1,10 @@
 import { ChainId } from '@pancakeswap/chains'
-import {
-  BIT_QUERY,
-  INFO_CLIENT,
-  STABLESWAP_SUBGRAPH_CLIENT,
-  INFO_CLIENT_ETH,
-  V3_SUBGRAPH_URLS,
-  V3_BSC_INFO_CLIENT,
-} from 'config/constants/endpoints'
+import { STABLE_SUPPORTED_CHAIN_IDS } from '@pancakeswap/stable-swap-sdk'
+import { BIT_QUERY, STABLESWAP_SUBGRAPHS_URLS, V3_BSC_INFO_CLIENT, V3_SUBGRAPH_URLS } from 'config/constants/endpoints'
 import { GraphQLClient } from 'graphql-request'
-import { INFO_CLIENT_WITH_CHAIN } from '../config/constants/endpoints'
+import { V2_SUBGRAPH_URLS } from '../config/constants/endpoints'
 
-// Extra headers
-// Mostly for dev environment
-// No production env check since production preview might also need them
-export const getGQLHeaders = (endpoint: string) => {
-  if (endpoint === INFO_CLIENT && process.env.NEXT_PUBLIC_NODE_REAL_HEADER) {
-    return {
-      origin: process.env.NEXT_PUBLIC_NODE_REAL_HEADER,
-    }
-  }
-  return undefined
-}
-
-export const infoClient = new GraphQLClient(INFO_CLIENT)
-
-export const infoClientWithChain = (chainId: number) => {
-  if (INFO_CLIENT_WITH_CHAIN[chainId]) {
-    return new GraphQLClient(INFO_CLIENT_WITH_CHAIN[chainId], {
-      headers: getGQLHeaders(INFO_CLIENT_WITH_CHAIN[chainId]),
-    })
-  }
-  return undefined
-}
+export const infoClient = new GraphQLClient(V2_SUBGRAPH_URLS[ChainId.BSC])
 
 export const v3Clients = {
   [ChainId.ETHEREUM]: new GraphQLClient(V3_SUBGRAPH_URLS[ChainId.ETHEREUM]),
@@ -53,29 +26,23 @@ export const v3Clients = {
 
 export const v3InfoClients = { ...v3Clients, [ChainId.BSC]: new GraphQLClient(V3_BSC_INFO_CLIENT) }
 
-export const infoClientETH = new GraphQLClient(INFO_CLIENT_ETH)
-
 export const v2Clients = {
-  [ChainId.ETHEREUM]: infoClientETH,
-  [ChainId.BSC]: infoClient,
-  [ChainId.POLYGON_ZKEVM]: new GraphQLClient(INFO_CLIENT_WITH_CHAIN[ChainId.POLYGON_ZKEVM]),
-  [ChainId.ZKSYNC]: new GraphQLClient(INFO_CLIENT_WITH_CHAIN[ChainId.ZKSYNC]),
-  [ChainId.LINEA]: new GraphQLClient(INFO_CLIENT_WITH_CHAIN[ChainId.LINEA]),
-  [ChainId.BASE]: new GraphQLClient(INFO_CLIENT_WITH_CHAIN[ChainId.BASE]),
-  [ChainId.ARBITRUM_ONE]: new GraphQLClient(INFO_CLIENT_WITH_CHAIN[ChainId.ARBITRUM_ONE]),
-  [ChainId.OPBNB]: new GraphQLClient(INFO_CLIENT_WITH_CHAIN[ChainId.OPBNB]),
+  [ChainId.ETHEREUM]: new GraphQLClient(V2_SUBGRAPH_URLS[ChainId.ETHEREUM]),
+  [ChainId.BSC]: new GraphQLClient(V2_SUBGRAPH_URLS[ChainId.BSC]),
+  [ChainId.POLYGON_ZKEVM]: new GraphQLClient(V2_SUBGRAPH_URLS[ChainId.POLYGON_ZKEVM]),
+  [ChainId.ZKSYNC]: new GraphQLClient(V2_SUBGRAPH_URLS[ChainId.ZKSYNC]),
+  [ChainId.LINEA]: new GraphQLClient(V2_SUBGRAPH_URLS[ChainId.LINEA]),
+  [ChainId.BASE]: new GraphQLClient(V2_SUBGRAPH_URLS[ChainId.BASE]),
+  [ChainId.ARBITRUM_ONE]: new GraphQLClient(V2_SUBGRAPH_URLS[ChainId.ARBITRUM_ONE]),
+  [ChainId.OPBNB]: new GraphQLClient(V2_SUBGRAPH_URLS[ChainId.OPBNB]),
 }
 
-export const infoStableSwapClient = new GraphQLClient(STABLESWAP_SUBGRAPH_CLIENT)
-
-export const infoServerClient = new GraphQLClient(INFO_CLIENT, {
-  timeout: 5000,
-  headers: {
-    origin: 'https://pancakeswap.finance',
-  },
-})
-
-export const stableSwapClient = new GraphQLClient(STABLESWAP_SUBGRAPH_CLIENT)
+export const infoStableSwapClients: Record<(typeof STABLE_SUPPORTED_CHAIN_IDS)[number], GraphQLClient> = {
+  [ChainId.BSC]: new GraphQLClient(STABLESWAP_SUBGRAPHS_URLS[ChainId.BSC]),
+  [ChainId.ARBITRUM_ONE]: new GraphQLClient(STABLESWAP_SUBGRAPHS_URLS[ChainId.ARBITRUM_ONE]),
+  [ChainId.ETHEREUM]: new GraphQLClient(STABLESWAP_SUBGRAPHS_URLS[ChainId.ETHEREUM]),
+  [ChainId.BSC_TESTNET]: new GraphQLClient(STABLESWAP_SUBGRAPHS_URLS[ChainId.BSC_TESTNET]),
+}
 
 export const bitQueryServerClient = new GraphQLClient(BIT_QUERY, {
   headers: {

@@ -1,19 +1,22 @@
-import { styled } from 'styled-components'
+import { chainNames } from '@pancakeswap/chains'
+import { PredictionStatus } from '@pancakeswap/prediction'
+import { Button, Flex, HelpIcon, PrizeIcon } from '@pancakeswap/uikit'
+import { useActiveChainId } from 'hooks/useActiveChainId'
 import Link from 'next/link'
-import { Flex, HelpIcon, Button, PrizeIcon, useMatchBreakpoints } from '@pancakeswap/uikit'
+import { useRouter } from 'next/router'
+import { useMemo } from 'react'
 import { useGetPredictionsStatus } from 'state/predictions/hooks'
-import { PredictionStatus } from 'state/types'
-import Image from 'next/image'
+import { styled } from 'styled-components'
+import { TokenSelector } from 'views/Predictions/components/TokenSelector'
 import FlexRow from './FlexRow'
-import { PricePairLabel, TimerLabel } from './Label'
-import PrevNextNav from './PrevNextNav'
 import HistoryButton from './HistoryButton'
-import { JupiterPredictors } from './JupiterPredictors'
+import { TimerLabel } from './Label'
+import PrevNextNav from './PrevNextNav'
 
 const SetCol = styled.div`
   position: relative;
   flex: none;
-  width: auto;
+  width: 170px;
 
   ${({ theme }) => theme.mediaQueries.lg} {
     width: 270px;
@@ -61,63 +64,29 @@ const ButtonWrapper = styled.div`
   }
 `
 
-const BirthdayBunny = styled(Image)`
-  display: none;
-  position: absolute;
-  top: 0px;
-  right: 20%;
-  z-index: 0;
-
-  ${({ theme }) => theme.mediaQueries.lg} {
-    display: block;
-  }
-
-  @media only screen and (min-height: 600px) {
-    top: 3%;
-  }
-
-  @media only screen and (min-height: 1000px) {
-    top: 9%;
-  }
-
-  @media only screen and (min-height: 1100px) {
-    top: 14%;
-  }
-
-  @media only screen and (min-height: 1200px) {
-    top: 17%;
-  }
-
-  @media only screen and (min-height: 1300px) {
-    top: 250px;
-  }
-`
-
 const Menu = () => {
+  const { query } = useRouter()
+  const { chainId } = useActiveChainId()
   const status = useGetPredictionsStatus()
-  const { isDesktop } = useMatchBreakpoints()
+
+  const leaderboardUrl = useMemo(() => {
+    return chainId ? `/prediction/leaderboard?chain=${chainNames[chainId]}&token=${query.token}` : ''
+  }, [chainId, query.token])
 
   return (
     <FlexRow alignItems="center" p="16px" width="100%">
-      {isDesktop && <JupiterPredictors />}
       <SetCol>
-        <PricePairLabel />
+        <TokenSelector />
       </SetCol>
       {status === PredictionStatus.LIVE && (
         <>
           <FlexRow justifyContent="center">
             <PrevNextNav />
           </FlexRow>
-          <BirthdayBunny
-            width={349}
-            height={282}
-            src="/images/predictions/birthday/desktop-bunny.png"
-            alt="desktop-bunny"
-          />
           <SetCol>
             <Flex alignItems="center" justifyContent="flex-end">
               <TimerLabelWrapper>
-                <TimerLabel interval="5" unit="m" />
+                <TimerLabel />
               </TimerLabelWrapper>
               <HelpButtonWrapper>
                 <Button
@@ -132,7 +101,7 @@ const Menu = () => {
                 </Button>
               </HelpButtonWrapper>
               <LeaderboardButtonWrapper>
-                <Link href="/prediction/leaderboard" passHref>
+                <Link href={leaderboardUrl} passHref>
                   <Button variant="subtle" width="48px">
                     <PrizeIcon color="white" />
                   </Button>

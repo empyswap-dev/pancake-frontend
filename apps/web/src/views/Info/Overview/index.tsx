@@ -3,10 +3,11 @@ import { Card, Flex, Heading } from '@pancakeswap/uikit'
 import Page from 'components/Layout/Page'
 import { useMemo } from 'react'
 import {
-  useAllTokenDataSWR,
-  useProtocolChartDataSWR,
-  useProtocolDataSWR,
-  useProtocolTransactionsSWR,
+  useAllTokenDataQuery,
+  useProtocolChartDataTvlQuery,
+  useProtocolChartDataVolumeQuery,
+  useProtocolDataQuery,
+  useProtocolTransactionsQuery,
 } from 'state/info/hooks'
 import { TokenData } from 'state/info/types'
 import { styled } from 'styled-components'
@@ -40,16 +41,17 @@ const Overview: React.FC<React.PropsWithChildren> = () => {
     currentLanguage: { locale },
   } = useTranslation()
 
-  const protocolData = useProtocolDataSWR()
-  const chartData = useProtocolChartDataSWR()
-  const transactions = useProtocolTransactionsSWR()
+  const protocolData = useProtocolDataQuery()
+  const volumeChartData = useProtocolChartDataVolumeQuery()
+  const tvlChartData = useProtocolChartDataTvlQuery()
+  const transactions = useProtocolTransactionsQuery()
 
   const currentDate = useMemo(
     () => new Date().toLocaleString(locale, { month: 'short', year: 'numeric', day: 'numeric' }),
     [locale],
   )
 
-  const allTokens = useAllTokenDataSWR()
+  const allTokens = useAllTokenDataQuery()
 
   const formattedTokens = useMemo(() => {
     return Object.values(allTokens)
@@ -71,7 +73,8 @@ const Overview: React.FC<React.PropsWithChildren> = () => {
       <ChartCardsContainer>
         <Card>
           <HoverableChart
-            chartData={chartData}
+            volumeChartData={volumeChartData}
+            tvlChartData={tvlChartData}
             protocolData={protocolData}
             currentDate={currentDate}
             valueProperty="liquidityUSD"
@@ -81,7 +84,8 @@ const Overview: React.FC<React.PropsWithChildren> = () => {
         </Card>
         <Card>
           <HoverableChart
-            chartData={chartData}
+            volumeChartData={volumeChartData}
+            tvlChartData={tvlChartData}
             protocolData={protocolData}
             currentDate={currentDate}
             valueProperty="volumeUSD"

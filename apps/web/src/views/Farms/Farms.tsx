@@ -1,18 +1,15 @@
+import { ChainId } from '@pancakeswap/chains'
 import { DeserializedFarm, FarmWithStakedValue, filterFarmsByQuery } from '@pancakeswap/farms'
 import { useIntersectionObserver } from '@pancakeswap/hooks'
 import { useTranslation } from '@pancakeswap/localization'
-import { ChainId } from '@pancakeswap/chains'
 import {
-  ArrowForwardIcon,
   Box,
-  Button,
   Flex,
   FlexLayout,
   Heading,
   Image,
   Link,
   Loading,
-  NextLinkFromReactRouter,
   OptionProps,
   PageHeader,
   SearchInput,
@@ -21,22 +18,24 @@ import {
   Toggle,
   ToggleView,
 } from '@pancakeswap/uikit'
+
 import { FarmWidget } from '@pancakeswap/widgets-internal'
 import BigNumber from 'bignumber.js'
 import Page from 'components/Layout/Page'
 import { useActiveChainId } from 'hooks/useActiveChainId'
+import { useCakePrice } from 'hooks/useCakePrice'
 import orderBy from 'lodash/orderBy'
 import { useRouter } from 'next/router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFarms, usePollFarmsWithUserData } from 'state/farms/hooks'
-import { useCakePrice } from 'hooks/useCakePrice'
 import { useCakeVaultUserData } from 'state/pools/hooks'
 import { ViewMode } from 'state/user/actions'
 import { useUserFarmStakedOnly, useUserFarmsViewMode } from 'state/user/hooks'
 import { styled } from 'styled-components'
 import { getFarmApr } from 'utils/apr'
-import { useAccount } from 'wagmi'
 import { getStakedMinProgramFarms } from 'views/Farms/utils/getStakedMinProgramFarms'
+
+import { useAccount } from 'wagmi'
 
 import { V2Farm } from './FarmsV3'
 import Table from './components/FarmTable/FarmTable'
@@ -188,7 +187,7 @@ const Farms: React.FC<React.PropsWithChildren> = ({ children }) => {
   // Connected users should see loading indicator until first userData has loaded
   const userDataReady = !account || (!!account && userDataLoaded)
 
-  const [stakedOnly, setStakedOnly] = useUserFarmStakedOnly(isActive)
+  const [stakedOnly, , toggleStakedOnly] = useUserFarmStakedOnly(isActive)
   const [boostedOnly, setBoostedOnly] = useState(false)
   const [stableSwapOnly, setStableSwapOnly] = useState(false)
   const [farmTypesEnableCount, setFarmTypesEnableCount] = useState(0)
@@ -239,10 +238,11 @@ const Farms: React.FC<React.PropsWithChildren> = ({ children }) => {
                 totalLiquidity,
                 farm.lpAddress,
                 regularCakePerBlock,
+                farm.lpRewardsApr,
               )
             : { cakeRewardsApr: 0, lpRewardsApr: 0 }
 
-        return { ...farm, apr: cakeRewardsApr, lpRewardsApr, liquidity: totalLiquidity }
+        return { ...farm, apr: cakeRewardsApr ?? undefined, lpRewardsApr, liquidity: totalLiquidity }
       })
 
       return filterFarmsByQuery(farmsToDisplayWithAPR, query)
@@ -359,14 +359,6 @@ const Farms: React.FC<React.PropsWithChildren> = ({ children }) => {
               <FarmH2 scale="lg" color="text">
                 {t('Stake LP tokens to earn.')}
               </FarmH2>
-              <NextLinkFromReactRouter to="/farms/auction" prefetch={false}>
-                <Button p="0" variant="text">
-                  <Text color="primary" bold fontSize="16px" mr="4px">
-                    {t('Community Auctions')}
-                  </Text>
-                  <ArrowForwardIcon color="primary" />
-                </Button>
-              </NextLinkFromReactRouter>
             </Box>
             {chainId === ChainId.BSC && (
               <Box>
@@ -393,12 +385,7 @@ const Farms: React.FC<React.PropsWithChildren> = ({ children }) => {
                 handleSetFarmTypesEnableCount={setFarmTypesEnableCount}
               />
               <ToggleWrapper>
-                <Toggle
-                  id="staked-only-farms"
-                  checked={stakedOnly}
-                  onChange={() => setStakedOnly(!stakedOnly)}
-                  scale="sm"
-                />
+                <Toggle id="staked-only-farms" checked={stakedOnly} onChange={toggleStakedOnly} scale="sm" />
                 <Text> {t('Staked only')}</Text>
               </ToggleWrapper>
             </Flex>

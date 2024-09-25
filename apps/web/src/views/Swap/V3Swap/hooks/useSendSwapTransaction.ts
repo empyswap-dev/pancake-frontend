@@ -1,11 +1,10 @@
+import { ChainId } from '@pancakeswap/chains'
 import { useTranslation } from '@pancakeswap/localization'
 import { TradeType } from '@pancakeswap/sdk'
-import { ChainId } from '@pancakeswap/chains'
-import { SmartRouter, SmartRouterTrade } from '@pancakeswap/smart-router/evm'
+import { SmartRouter, SmartRouterTrade } from '@pancakeswap/smart-router'
 import { formatAmount } from '@pancakeswap/utils/formatFractions'
 import truncateHash from '@pancakeswap/utils/truncateHash'
 import { useUserSlippage } from '@pancakeswap/utils/user'
-import { SendTransactionResult } from 'wagmi/actions'
 import { INITIAL_ALLOWED_SLIPPAGE } from 'config/constants'
 import { useMemo } from 'react'
 import { useSwapState } from 'state/swap/hooks'
@@ -15,10 +14,19 @@ import { basisPointsToPercent } from 'utils/exchange'
 import { logSwap, logTx } from 'utils/log'
 import { isUserRejected } from 'utils/sentry'
 import { transactionErrorToUserReadableMessage } from 'utils/transactionErrorToUserReadableMessage'
-import { viemClients } from 'utils/viem'
-import { Address, Hex, hexToBigInt } from 'viem'
+import {
+  Address,
+  Hex,
+  SendTransactionReturnType,
+  TransactionExecutionError,
+  UserRejectedRequestError,
+  hexToBigInt,
+} from 'viem'
 import { useSendTransaction } from 'wagmi'
 
+import { usePaymaster } from 'hooks/usePaymaster'
+import { logger } from 'utils/datadog'
+import { viemClients } from 'utils/viem'
 import { isZero } from '../utils/isZero'
 
 interface SwapCall {
@@ -51,9 +59,10 @@ export class TransactionRejectedError extends Error {}
 export default function useSendSwapTransaction(
   account?: Address,
   chainId?: number,
-  trade?: SmartRouterTrade<TradeType>, // trade to execute, required
+  trade?: SmartRouterTrade<TradeType> | null, // trade to execute, required
   swapCalls: SwapCall[] | WallchainSwapCall[] = [],
-): { callback: null | (() => Promise<SendTransactionResult>) } {
+  type: 'V3SmartSwap' | 'UniversalRouter' = 'V3SmartSwap',
+) {
   const { t } = useTranslation()
   const addTransaction = useTransactionAdder()
   const { sendTransactionAsync } = useSendTransaction()
@@ -62,12 +71,15 @@ export default function useSendSwapTransaction(
   const { recipient } = useSwapState()
   const recipientAddress = recipient === null ? account : recipient
 
+  // Paymaster for zkSync
+  const { isPaymasterAvailable, isPaymasterTokenActive, sendPaymasterTransaction } = usePaymaster()
+
   return useMemo(() => {
     if (!trade || !sendTransactionAsync || !account || !chainId || !publicClient) {
       return { callback: null }
     }
     return {
-      callback: async function onSwap(): Promise<SendTransactionResult> {
+      callback: async function onSwap() {
         const estimatedCalls: SwapCallEstimate[] = await Promise.all(
           swapCalls.map((call) => {
             const { address, calldata, value } = call
@@ -87,7 +99,6 @@ export default function useSendSwapTransaction(
                     data: calldata,
                     value: hexToBigInt(value),
                   }
-
             return publicClient
               .estimateGas(tx)
               .then((gasEstimate) => {
@@ -97,7 +108,7 @@ export default function useSendSwapTransaction(
                 }
               })
               .catch((gasError) => {
-                console.debug('Gas estimate failed, trying eth_call to extract error', call)
+                console.debug('Gas estimate failed, trying to extract error', call, gasError)
                 return { call, error: transactionErrorToUserReadableMessage(gasError, t) }
               })
           }),
@@ -135,18 +146,26 @@ export default function useSendSwapTransaction(
         } else {
           call.gas =
             'gasEstimate' in bestCallOption && bestCallOption.gasEstimate
-              ? calculateGasMargin(bestCallOption.gasEstimate)
+              ? calculateGasMargin(bestCallOption.gasEstimate, 2000n)
               : undefined
         }
 
-        return sendTransactionAsync({
-          account,
-          chainId,
-          to: call.address,
-          data: call.calldata,
-          value: call.value && !isZero(call.value) ? hexToBigInt(call.value) : 0n,
-          gas: call.gas,
-        })
+        let sendTxResult: Promise<SendTransactionReturnType> | undefined
+
+        if (isPaymasterAvailable && isPaymasterTokenActive) {
+          sendTxResult = sendPaymasterTransaction(call, account)
+        } else {
+          sendTxResult = sendTransactionAsync({
+            account,
+            chainId,
+            to: call.address,
+            data: call.calldata,
+            value: call.value && !isZero(call.value) ? hexToBigInt(call.value) : 0n,
+            gas: call.gas,
+          })
+        }
+
+        return sendTxResult
           .then((response) => {
             const inputSymbol = trade.inputAmount.currency.symbol
             const outputSymbol = trade.outputAmount.currency.symbol
@@ -179,32 +198,35 @@ export default function useSendSwapTransaction(
                 : recipient === account
                 ? 'Swap %inputAmount% %inputSymbol% for min. %outputAmount% %outputSymbol%'
                 : 'Swap %inputAmount% %inputSymbol% for min. %outputAmount% %outputSymbol% to %recipientAddress%'
-            addTransaction(response, {
-              summary: withRecipient,
-              translatableSummary: {
-                text: translatableWithRecipient,
-                data: {
-                  inputAmount,
-                  inputSymbol,
-                  outputAmount,
-                  outputSymbol,
-                  ...(recipient !== account && { recipientAddress: recipientAddressText }),
+            addTransaction(
+              { hash: response },
+              {
+                summary: withRecipient,
+                translatableSummary: {
+                  text: translatableWithRecipient,
+                  data: {
+                    inputAmount,
+                    inputSymbol,
+                    outputAmount,
+                    outputSymbol,
+                    ...(recipient !== account && { recipientAddress: recipientAddressText }),
+                  },
                 },
+                type: 'swap',
               },
-              type: 'swap',
-            })
+            )
             logSwap({
               account,
               chainId,
-              hash: response.hash,
+              hash: response,
               inputAmount,
               outputAmount,
               input: trade.inputAmount.currency,
               output: trade.outputAmount.currency,
-              type: 'V3SmartSwap',
+              type,
             })
-            logTx({ account, chainId, hash: response.hash })
-            return response
+            logTx({ account, chainId, hash: response })
+            return { hash: response }
           })
           .catch((error) => {
             // if the user rejected the tx, pass this along
@@ -212,7 +234,30 @@ export default function useSendSwapTransaction(
               throw new TransactionRejectedError(t('Transaction rejected'))
             } else {
               // otherwise, the error was unexpected and we need to convey that
-              console.error(`Swap failed`, error, call.address, call.calldata, call.value)
+              logger.warn(
+                'Swap failed',
+                {
+                  chainId,
+                  input: trade.inputAmount.currency,
+                  output: trade.outputAmount.currency,
+                  address: call.address,
+                  value: call.value,
+                  type,
+                  target: 'AMM',
+                  errorName: error?.name,
+                  cause: error instanceof TransactionExecutionError ? error.cause : undefined,
+                },
+                error,
+              )
+
+              if (isPaymasterAvailable && isPaymasterTokenActive) {
+                throw new Error(
+                  `Swap failed: ${t('Try again with more gas token balance.')} ${transactionErrorToUserReadableMessage(
+                    error,
+                    t,
+                  )}`,
+                )
+              }
 
               throw new Error(`Swap failed: ${transactionErrorToUserReadableMessage(error, t)}`)
             }
@@ -231,5 +276,17 @@ export default function useSendSwapTransaction(
     recipientAddress,
     recipient,
     addTransaction,
+    type,
+    sendPaymasterTransaction,
+    isPaymasterAvailable,
+    isPaymasterTokenActive,
   ])
+}
+
+export const userRejectedError = (error: unknown): boolean => {
+  return (
+    error instanceof UserRejectedRequestError ||
+    error instanceof TransactionRejectedError ||
+    (typeof error !== 'string' && isUserRejected(error))
+  )
 }

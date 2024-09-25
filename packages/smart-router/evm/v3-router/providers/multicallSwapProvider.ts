@@ -1,9 +1,10 @@
-/* eslint-disable no-console, camelcase, @typescript-eslint/no-non-null-assertion */
-import { BigintIsh } from '@pancakeswap/sdk'
+/* eslint-disable camelcase, @typescript-eslint/no-non-null-assertion */
 import { ChainId } from '@pancakeswap/chains'
-import { encodeFunctionData, PublicClient, decodeFunctionResult } from 'viem'
-import stats from 'stats-lite'
 import { multicallByGasLimit } from '@pancakeswap/multicall'
+import { BigintIsh } from '@pancakeswap/sdk'
+import stats from 'stats-lite'
+import { PublicClient, decodeFunctionResult, encodeFunctionData } from 'viem'
+import { AbortControl } from '@pancakeswap/utils/abortControl'
 
 import IMulticallABI from '../../abis/InterfaceMulticall'
 import {
@@ -23,7 +24,7 @@ export type PancakeMulticallConfig = {
   gasBuffer?: BigintIsh
 
   dropUnexecutedCalls?: boolean
-}
+} & AbortControl
 
 /**
  * The PancakeswapMulticall contract has added functionality for limiting the amount of gas
@@ -37,7 +38,11 @@ export type PancakeMulticallConfig = {
 export class PancakeMulticallProvider extends IMulticallProvider<PancakeMulticallConfig> {
   static abi = IMulticallABI
 
-  constructor(protected chainId: ChainId, protected provider: PublicClient, protected gasLimitPerCall = 1_000_000) {
+  constructor(
+    protected chainId: ChainId,
+    protected provider: PublicClient | undefined,
+    protected gasLimitPerCall = 1_000_000,
+  ) {
     super()
     this.provider = provider
   }
@@ -75,6 +80,7 @@ export class PancakeMulticallProvider extends IMulticallProvider<PancakeMultical
       dropUnexecutedCalls: additionalConfig?.dropUnexecutedCalls,
       chainId: this.chainId,
       client: this.provider,
+      signal: additionalConfig?.signal,
     })
 
     const results: Result<TReturn>[] = []
@@ -155,6 +161,7 @@ export class PancakeMulticallProvider extends IMulticallProvider<PancakeMultical
       dropUnexecutedCalls: additionalConfig?.dropUnexecutedCalls,
       chainId: this.chainId,
       client: this.provider,
+      signal: additionalConfig?.signal,
     })
 
     const results: Result<TReturn>[] = []
@@ -233,6 +240,7 @@ export class PancakeMulticallProvider extends IMulticallProvider<PancakeMultical
       dropUnexecutedCalls: additionalConfig?.dropUnexecutedCalls,
       chainId: this.chainId,
       client: this.provider,
+      signal: additionalConfig?.signal,
     })
 
     const results: Result<TReturn>[] = []

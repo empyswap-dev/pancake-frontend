@@ -1,12 +1,18 @@
-import { useTranslation } from '@pancakeswap/localization'
-import { Button, NextLinkFromReactRouter, IfoSkeletonCardActions } from '@pancakeswap/uikit'
-import { useAccount } from 'wagmi'
-import { Ifo, PoolIds } from 'config/constants/types'
-import { WalletIfoData, PublicIfoData } from 'views/Ifos/types'
+import { IfoSkeletonCardActions } from '@pancakeswap/uikit'
+
+import { Ifo, PoolIds } from '@pancakeswap/ifos'
 import ConnectWalletButton from 'components/ConnectWalletButton'
-import ContributeButton from './ContributeButton'
-import ClaimButton from './ClaimButton'
+import { useActiveChainId } from 'hooks/useActiveChainId'
+import { isBasicSale } from 'views/Ifos/hooks/v7/helpers'
+import { PublicIfoData, WalletIfoData } from 'views/Ifos/types'
+import { useAccount } from 'wagmi'
+
+import { useMemo } from 'react'
 import { EnableStatus } from '../types'
+import { ActivateProfileButton } from './ActivateProfileButton'
+import ClaimButton from './ClaimButton'
+import ContributeButton from './ContributeButton'
+import { SwitchNetworkTips } from './SwitchNetworkTips'
 
 interface Props {
   poolId: PoolIds
@@ -29,9 +35,23 @@ const IfoCardActions: React.FC<React.PropsWithChildren<Props>> = ({
   isEligible,
   enableStatus,
 }) => {
-  const { t } = useTranslation()
   const { address: account } = useAccount()
+  const { chainId } = useActiveChainId()
   const userPoolCharacteristics = walletIfoData[poolId]
+
+  const needClaim = useMemo(
+    () =>
+      publicIfoData.status === 'finished' &&
+      !userPoolCharacteristics?.hasClaimed &&
+      (userPoolCharacteristics?.offeringAmountInToken.isGreaterThan(0) ||
+        userPoolCharacteristics?.refundingAmountInLP.isGreaterThan(0)),
+    [
+      publicIfoData.status,
+      userPoolCharacteristics?.hasClaimed,
+      userPoolCharacteristics?.offeringAmountInToken,
+      userPoolCharacteristics?.refundingAmountInLP,
+    ],
+  )
 
   if (isLoading) {
     return <IfoSkeletonCardActions />
@@ -41,19 +61,13 @@ const IfoCardActions: React.FC<React.PropsWithChildren<Props>> = ({
     return <ConnectWalletButton width="100%" />
   }
 
-  if (!hasProfile) {
-    return (
-      <Button as={NextLinkFromReactRouter} to={`/profile/${account.toLowerCase()}`} width="100%">
-        {t('Activate your Profile')}
-      </Button>
-    )
+  if (!hasProfile && !isBasicSale(publicIfoData[poolId]?.saleType)) {
+    return <ActivateProfileButton saleFinished={publicIfoData.status === 'finished'} />
   }
 
-  const needClaim =
-    publicIfoData.status === 'finished' &&
-    !userPoolCharacteristics.hasClaimed &&
-    (userPoolCharacteristics.offeringAmountInToken.isGreaterThan(0) ||
-      userPoolCharacteristics.refundingAmountInLP.isGreaterThan(0))
+  if (ifo.version >= 7 && ifo.chainId !== chainId) {
+    return <SwitchNetworkTips ifoChainId={ifo.chainId} />
+  }
 
   if (needClaim) {
     return <ClaimButton poolId={poolId} ifoVersion={ifo.version} walletIfoData={walletIfoData} />

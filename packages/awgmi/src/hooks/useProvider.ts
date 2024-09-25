@@ -1,17 +1,16 @@
 // eslint-disable-next-line import/extensions
-import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/shim/with-selector.js'
-import { AptosClient } from 'aptos'
 import { GetProviderArgs, getProvider, watchProvider } from '@pancakeswap/awgmi/core'
+import { Aptos } from '@aptos-labs/ts-sdk'
+import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/shim/with-selector.js'
 
 export type UseProviderArgs = Partial<GetProviderArgs>
 
-export function useProvider<TProvider extends AptosClient = AptosClient>({ networkName }: UseProviderArgs = {}) {
+export function useProvider<TProvider extends Aptos = Aptos>({ networkName }: UseProviderArgs = {}) {
   return useSyncExternalStoreWithSelector(
     (cb) => watchProvider<TProvider>({ networkName }, cb),
     () => getProvider<TProvider>({ networkName }),
     () => getProvider<TProvider>({ networkName }),
     (x) => x,
-    // FIXME: should have better way to compare
-    (a, b) => a.client.accounts.httpRequest.config.BASE === b.client.accounts.httpRequest.config.BASE,
+    (a, b) => a.config.fullnode === b.config.fullnode,
   )
 }

@@ -1,30 +1,47 @@
+import { ChainId } from '@pancakeswap/chains'
+import { isCakeVaultSupported } from '@pancakeswap/pools'
+import { Flex } from '@pancakeswap/uikit'
 import { useMemo } from 'react'
-import { Flex, useMatchBreakpoints } from '@pancakeswap/uikit'
-import { Pool } from '@pancakeswap/widgets-internal'
+import { Address } from 'viem'
 
-import CakeVaultCard from 'views/Pools/components/CakeVaultCard'
-import { usePoolsWithVault } from 'state/pools/hooks'
-import { Token } from '@pancakeswap/sdk'
-import IfoPoolVaultCardMobile from './IfoPoolVaultCardMobile'
+import { useActiveChainId } from 'hooks/useActiveChainId'
+
+import { isCrossChainIfoSupportedOnly } from '@pancakeswap/ifos'
+import { useActiveIfoConfig } from 'hooks/useIfoConfig'
+import { CrossChainVeCakeCard } from './CrossChainVeCakeCard'
 import IfoVesting from './IfoVesting/index'
+import { VeCakeCard } from './VeCakeCard'
 
-const IfoPoolVaultCard = () => {
-  const { isXl, isLg, isMd, isXs, isSm } = useMatchBreakpoints()
-  const isSmallerThanXl = isXl || isLg || isMd || isXs || isSm
-  const { pools } = usePoolsWithVault()
-  const cakePool = useMemo(
-    () => pools.find((pool) => pool.userData && pool.sousId === 0),
-    [pools],
-  ) as Pool.DeserializedPool<Token>
+type Props = {
+  ifoBasicSaleType?: number
+  ifoAddress?: Address
+  ifoChainId?: ChainId
+}
+
+const IfoPoolVaultCard = ({ ifoBasicSaleType, ifoAddress }: Props) => {
+  const { chainId } = useActiveChainId()
+  const { activeIfo } = useActiveIfoConfig()
+
+  const targetChainId = useMemo(() => activeIfo?.chainId || chainId, [activeIfo, chainId])
+  const cakeVaultSupported = useMemo(() => isCakeVaultSupported(targetChainId), [targetChainId])
+
+  const vault = useMemo(
+    () =>
+      cakeVaultSupported ? (
+        <VeCakeCard ifoAddress={ifoAddress} />
+      ) : isCrossChainIfoSupportedOnly(targetChainId) ? (
+        <CrossChainVeCakeCard ifoAddress={ifoAddress} />
+      ) : null,
+    [targetChainId, cakeVaultSupported, ifoAddress],
+  )
 
   return (
     <Flex width="100%" maxWidth={400} alignItems="center" flexDirection="column">
-      {isSmallerThanXl ? (
-        <IfoPoolVaultCardMobile pool={cakePool} />
-      ) : (
-        <CakeVaultCard pool={cakePool} showSkeleton={false} showStakedOnly={false} showICake />
-      )}
-      <IfoVesting pool={cakePool} />
+      {vault}
+
+      {/* Note: Only show when user is connected to BSC for now. 
+      When CrossChain IFO is moved to finished, can enable this again for all chains */}
+      {chainId === ChainId.BSC && <IfoVesting ifoBasicSaleType={ifoBasicSaleType} />}
     </Flex>
   )
 }

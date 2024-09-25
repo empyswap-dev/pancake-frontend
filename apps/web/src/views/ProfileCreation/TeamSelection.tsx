@@ -1,17 +1,21 @@
-import { useMemo } from 'react'
-import { Card, CardBody, CommunityIcon, Flex, Heading, Text } from '@pancakeswap/uikit'
-import useSWR from 'swr'
-import shuffle from 'lodash/shuffle'
-import { getTeams } from 'state/teams/helpers'
 import { useTranslation } from '@pancakeswap/localization'
-import SelectionCard from './SelectionCard'
+import { Card, CardBody, CommunityIcon, Flex, Heading, Text } from '@pancakeswap/uikit'
+import { useQuery } from '@tanstack/react-query'
+import { ASSET_CDN } from 'config/constants/endpoints'
+import shuffle from 'lodash/shuffle'
+import { useMemo } from 'react'
+import { getTeams } from 'state/teams/helpers'
 import NextStepButton from './NextStepButton'
+import SelectionCard from './SelectionCard'
 import useProfileCreation from './contexts/hook'
 
 const Team: React.FC<React.PropsWithChildren> = () => {
   const { teamId: currentTeamId, actions } = useProfileCreation()
   const { t } = useTranslation()
-  const { data: teams } = useSWR('teams', async () => getTeams())
+  const { data: teams } = useQuery({
+    queryKey: ['teams'],
+    queryFn: async () => getTeams(),
+  })
   const teamValues = useMemo(() => (teams ? shuffle(Object.values(teams)) : []), [teams])
   const handleTeamSelection = (value: string) => actions.setTeamId(parseInt(value, 10))
 
@@ -44,7 +48,7 @@ const Team: React.FC<React.PropsWithChildren> = () => {
                   name="teams-selection"
                   value={team.id}
                   isChecked={currentTeamId === team.id}
-                  image={`/images/teams/${team.images.md}`}
+                  image={`${ASSET_CDN}/web/teams/${team.images.md}`}
                   onChange={handleTeamSelection}
                   disabled={!team.isJoinable}
                 >

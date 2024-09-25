@@ -1,25 +1,31 @@
-import BigNumber from 'bignumber.js'
-import { FAST_INTERVAL } from 'config/constants'
-import { SerializedFarmConfig } from 'config/constants/types'
-import { DEFAULT_TOKEN_DECIMAL } from 'config'
-import useSWR from 'swr'
-import { useFarmsLength } from 'state/farms/hooks'
-import { getFarmConfig } from '@pancakeswap/farms/constants'
+import { getLegacyFarmConfig } from '@pancakeswap/farms'
+import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
 import { getBalanceNumber } from '@pancakeswap/utils/formatBalance'
-import { useBCakeProxyContract, useCake, useMasterchef, useMasterchefV3 } from 'hooks/useContract'
-import { useCallback, useMemo } from 'react'
-import { useStakedPositionsByUser } from 'state/farmsV3/hooks'
-import { useV3TokenIdsByAccount } from 'hooks/v3/useV3Positions'
+import { useQuery } from '@tanstack/react-query'
+import BigNumber from 'bignumber.js'
+import { DEFAULT_TOKEN_DECIMAL } from 'config'
+import { masterChefV2ABI } from 'config/abi/masterchefV2'
+import { v2BCakeWrapperABI } from 'config/abi/v2BCakeWrapper'
+import { FAST_INTERVAL } from 'config/constants'
+import { SerializedFarmConfig, SerializedFarmPublicData } from 'config/constants/types'
 import useAccountActiveChain from 'hooks/useAccountActiveChain'
+import { useBCakeProxyContract, useCake, useMasterchef, useMasterchefV3 } from 'hooks/useContract'
+import { useV3TokenIdsByAccount } from 'hooks/v3/useV3Positions'
+import { useCallback, useMemo } from 'react'
+import { useFarmsLength } from 'state/farms/hooks'
+import { useStakedPositionsByUser } from 'state/farmsV3/hooks'
+import { getV2SSBCakeWrapperContract } from 'utils/contractHelpers'
 import { verifyBscNetwork } from 'utils/verifyBscNetwork'
 import { publicClient } from 'utils/wagmi'
-import { masterChefV2ABI } from 'config/abi/masterchefV2'
-import { useBCakeProxyContractAddress } from '../../Farms/hooks/useBCakeProxyContractAddress'
+import { useWalletClient } from 'wagmi'
+import { useBCakeProxyContractAddress } from '../../../hooks/useBCakeProxyContractAddress'
 import splitProxyFarms from '../../Farms/components/YieldBooster/helpers/splitProxyFarms'
 
 export type FarmWithBalance = {
   balance: BigNumber
   contract: any
+  bCakeBalance: BigNumber
+  bCakeContract: any | undefined
 } & SerializedFarmConfig
 
 const useFarmsWithBalance = () => {
@@ -35,43 +41,83 @@ const useFarmsWithBalance = () => {
 
   const { tokenIdResults: v3PendingCakes } = useStakedPositionsByUser(stakedTokenIds)
 
+  const { data: signer } = useWalletClient()
+
   const getFarmsWithBalances = useCallback(
-    async (farms: SerializedFarmConfig[], accountToCheck: string, contract) => {
-      const result = await publicClient({ chainId }).multicall({
-        contracts: farms.map((farm) => ({
-          abi: masterChefV2ABI,
-          address: masterChefContract.address,
-          functionName: 'pendingCake',
-          args: [farm.pid, accountToCheck],
-        })),
-      })
+    async (farms: SerializedFarmPublicData[], accountToCheck: string, contract) => {
+      const isUserAccount = accountToCheck.toLowerCase() === account?.toLowerCase()
+
+      const result = masterChefContract
+        ? await publicClient({ chainId }).multicall({
+            contracts: farms.map((farm) => ({
+              abi: masterChefV2ABI,
+              address: masterChefContract.address,
+              functionName: 'pendingCake',
+              args: [farm.pid, accountToCheck],
+            })),
+          })
+        : undefined
+
+      const bCakeResult = isUserAccount
+        ? await publicClient({ chainId }).multicall({
+            contracts: farms
+              .filter((farm) => Boolean(farm?.bCakeWrapperAddress))
+              .map((farm) => {
+                return {
+                  abi: v2BCakeWrapperABI,
+                  address: farm?.bCakeWrapperAddress ?? '0x',
+                  functionName: 'pendingReward',
+                  args: [accountToCheck] as const,
+                } as const
+              }),
+          })
+        : []
+
+      let bCakeIndex = 0
 
       const proxyCakeBalance =
-        contract.address !== masterChefContract.address && bCakeProxy
+        masterChefContract && contract.address !== masterChefContract.address && bCakeProxy && cake
           ? await cake.read.balanceOf([bCakeProxy.address])
           : null
 
       const proxyCakeBalanceNumber = proxyCakeBalance ? getBalanceNumber(new BigNumber(proxyCakeBalance.toString())) : 0
-      const results = farms.map((farm, index) => ({
-        ...farm,
-        balance: new BigNumber((result[index].result as bigint).toString()),
-      }))
+      const results = farms.map((farm, index) => {
+        let bCakeBalance = BIG_ZERO
+        if (isUserAccount && farm?.bCakeWrapperAddress) {
+          bCakeBalance = new BigNumber(((bCakeResult[bCakeIndex].result as bigint) ?? '0').toString())
+          bCakeIndex++
+        }
+        return {
+          ...farm,
+          balance: result ? new BigNumber((result[index].result as bigint).toString()) : BIG_ZERO,
+          bCakeBalance,
+        }
+      })
       const farmsWithBalances: FarmWithBalance[] = results
-        .filter((balanceType) => balanceType.balance.gt(0))
+        .filter((balanceType) => balanceType.balance.gt(0) || balanceType.bCakeBalance.gt(0))
         .map((farm) => ({
           ...farm,
           contract,
+          bCakeContract:
+            isUserAccount && farm.bCakeWrapperAddress
+              ? getV2SSBCakeWrapperContract(farm.bCakeWrapperAddress, signer ?? undefined, chainId)
+              : undefined,
         }))
       const totalEarned = farmsWithBalances.reduce((accum, earning) => {
         const earningNumber = new BigNumber(earning.balance)
-        if (earningNumber.eq(0)) {
+        const earningBCakeNumber = new BigNumber(earning.bCakeBalance)
+        if (earningNumber.eq(0) && earningBCakeNumber.eq(0)) {
           return accum
         }
-        return accum + earningNumber.div(DEFAULT_TOKEN_DECIMAL).toNumber()
+        return (
+          accum +
+          earningNumber.div(DEFAULT_TOKEN_DECIMAL).toNumber() +
+          earningBCakeNumber.div(DEFAULT_TOKEN_DECIMAL).toNumber()
+        )
       }, 0)
       return { farmsWithBalances, totalEarned: totalEarned + proxyCakeBalanceNumber }
     },
-    [bCakeProxy, cake?.read, chainId, masterChefContract?.address],
+    [bCakeProxy, cake, chainId, masterChefContract, account, signer],
   )
 
   const {
@@ -79,14 +125,14 @@ const useFarmsWithBalance = () => {
       farmsWithStakedBalance: [] as FarmWithBalance[],
       earningsSum: null,
     },
-  } = useSWR(
-    account && poolLength && chainId && !isProxyContractAddressLoading
-      ? [account, 'farmsWithBalance', chainId, poolLength]
-      : null,
-    async () => {
-      const farmsConfig = await getFarmConfig(chainId)
+  } = useQuery({
+    queryKey: [account, 'farmsWithBalance', chainId, poolLength],
+
+    queryFn: async () => {
+      if (!account || !poolLength || !chainId) return undefined
+      const farmsConfig = await getLegacyFarmConfig(chainId)
       const farmsCanFetch = farmsConfig?.filter((f) => poolLength > f.pid)
-      const normalBalances = await getFarmsWithBalances(farmsCanFetch, account, masterChefContract)
+      const normalBalances = await getFarmsWithBalances(farmsCanFetch ?? [], account, masterChefContract)
       if (proxyAddress && farmsCanFetch?.length && verifyBscNetwork(chainId)) {
         const { farmsWithProxy } = splitProxyFarms(farmsCanFetch)
 
@@ -101,8 +147,10 @@ const useFarmsWithBalance = () => {
         earningsSum: normalBalances.totalEarned,
       }
     },
-    { refreshInterval: FAST_INTERVAL },
-  )
+
+    enabled: Boolean(account && poolLength && chainId && !isProxyContractAddressLoading),
+    refetchInterval: FAST_INTERVAL,
+  })
 
   const v3FarmsWithBalance = useMemo(
     () =>
@@ -126,7 +174,7 @@ const useFarmsWithBalance = () => {
     return {
       farmsWithStakedBalance: [...farmsWithStakedBalance, ...v3FarmsWithBalance],
       earningsSum:
-        earningsSum +
+        (earningsSum ?? 0) +
           v3PendingCakes?.reduce((accum, earning) => {
             const earningNumber = new BigNumber(earning.toString())
             if (earningNumber.eq(0)) {

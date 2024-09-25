@@ -1,56 +1,73 @@
-import { useTranslation } from '@pancakeswap/localization'
 import { ChainId } from '@pancakeswap/chains'
+import { useTranslation } from '@pancakeswap/localization'
 import {
   AtomBox,
+  AutoColumn,
+  AutoRow,
+  Button,
+  ButtonProps,
+  Checkbox,
   Flex,
   InjectedModalProps,
+  Message,
+  MessageText,
   Modal,
+  ModalV2,
+  NotificationDot,
   PancakeToggle,
+  PreTitle,
   QuestionHelper,
+  RowFixed,
   Text,
   ThemeSwitcher,
   Toggle,
-  Button,
-  ModalV2,
-  PreTitle,
-  AutoColumn,
-  Message,
-  MessageText,
-  NotificationDot,
-  ButtonProps,
-  Checkbox,
-  AutoRow,
-  RowFixed,
 } from '@pancakeswap/uikit'
-import { ExpertModal } from '@pancakeswap/widgets-internal'
-import { useActiveChainId } from 'hooks/useActiveChainId'
-import useTheme from 'hooks/useTheme'
-import { ReactNode, useCallback, useState } from 'react'
-import { useSwapActionHandlers } from 'state/swap/useSwapActionHandlers'
 import {
   useAudioPlay,
   useExpertMode,
-  useUserSingleHopOnly,
   useUserExpertModeAcknowledgement,
+  useUserSingleHopOnly,
 } from '@pancakeswap/utils/user'
+import { ExpertModal } from '@pancakeswap/widgets-internal'
+import { TOKEN_RISK } from 'components/AccessRisk'
+import AccessRiskTooltips from 'components/AccessRisk/AccessRiskTooltips'
+import { useActiveChainId } from 'hooks/useActiveChainId'
+import useTheme from 'hooks/useTheme'
+import { useWebNotifications } from 'hooks/useWebNotifications'
+import { ReactNode, Suspense, lazy, useCallback, useState } from 'react'
+import { useSwapActionHandlers } from 'state/swap/useSwapActionHandlers'
 import { useSubgraphHealthIndicatorManager, useUserUsernameVisibility } from 'state/user/hooks'
+import { useUserShowTestnet } from 'state/user/hooks/useUserShowTestnet'
 import { useUserTokenRisk } from 'state/user/hooks/useUserTokenRisk'
+import { useSpeedQuote } from 'hooks/useSpeedQuote'
 import {
+  useMMLinkedPoolByDefault,
   useOnlyOneAMMSourceEnabled,
+  useRoutingSettingChanged,
   useUserSplitRouteEnable,
   useUserStableSwapEnable,
   useUserV2SwapEnable,
   useUserV3SwapEnable,
-  useRoutingSettingChanged,
 } from 'state/user/smartRouter'
-import { useMMLinkedPoolByDefault } from 'state/user/mmLinkedPool'
 import { styled } from 'styled-components'
-import { TOKEN_RISK } from 'components/AccessRisk'
-import AccessRiskTooltips from 'components/AccessRisk/AccessRiskTooltips'
 import GasSettings from './GasSettings'
 import TransactionSettings from './TransactionSettings'
 import { SettingsMode } from './types'
 
+const WebNotiToggle = lazy(() => import('./WebNotiToggle'))
+
+const BetaTag = styled.div`
+  border: 2px solid ${({ theme }) => theme.colors.success};
+  border-radius: 16px;
+  padding-left: 6px;
+  padding-right: 6px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  color: ${({ theme }) => theme.colors.success};
+  margin-left: 6px;
+  font-weight: bold;
+  font-size: 14px;
+`
 const ScrollableContainer = styled(Flex)`
   flex-direction: column;
   height: auto;
@@ -89,8 +106,12 @@ const SettingsModal: React.FC<React.PropsWithChildren<InjectedModalProps>> = ({ 
   const [showExpertModeAcknowledgement, setShowExpertModeAcknowledgement] = useUserExpertModeAcknowledgement()
   const [expertMode, setExpertMode] = useExpertMode()
   const [audioPlay, setAudioMode] = useAudioPlay()
+  const [speedQuote, setSpeedQuote] = useSpeedQuote()
   const [subgraphHealth, setSubgraphHealth] = useSubgraphHealthIndicatorManager()
   const [userUsernameVisibility, setUserUsernameVisibility] = useUserUsernameVisibility()
+  const [showTestnet, setShowTestnet] = useUserShowTestnet()
+  const { enabled } = useWebNotifications()
+
   const { onChangeRecipient } = useSwapActionHandlers()
   const { chainId } = useActiveChainId()
   const [tokenRisk, setTokenRisk] = useUserTokenRisk()
@@ -163,6 +184,35 @@ const SettingsModal: React.FC<React.PropsWithChildren<InjectedModalProps>> = ({ 
                   }}
                 />
               </Flex>
+              <Flex justifyContent="space-between" alignItems="center" mb="24px">
+                <Flex alignItems="center">
+                  <Text>{t('Allow notifications')}</Text>
+                  <QuestionHelper
+                    text={t(
+                      'Enables the web notifications feature. If turned off you will be automatically unsubscribed and the notification bell will not be visible',
+                    )}
+                    placement="top"
+                    ml="4px"
+                  />
+                  <BetaTag>{t('BETA')}</BetaTag>
+                </Flex>
+                <Suspense fallback={null}>
+                  <WebNotiToggle enabled={enabled} />
+                </Suspense>
+              </Flex>
+              <Flex justifyContent="space-between" alignItems="center" mb="24px">
+                <Flex alignItems="center">
+                  <Text>{t('Show testnet')}</Text>
+                </Flex>
+                <Toggle
+                  id="toggle-show-testnet"
+                  checked={showTestnet}
+                  scale="md"
+                  onChange={() => {
+                    setShowTestnet((s) => !s)
+                  }}
+                />
+              </Flex>
               {chainId === ChainId.BSC && (
                 <>
                   <Flex justifyContent="space-between" alignItems="center" mb="24px">
@@ -183,7 +233,7 @@ const SettingsModal: React.FC<React.PropsWithChildren<InjectedModalProps>> = ({ 
                       />
                     </Flex>
                     <Toggle
-                      id="toggle-username-visibility"
+                      id="toggle-token-risk"
                       checked={tokenRisk}
                       scale="md"
                       onChange={() => {
@@ -231,7 +281,28 @@ const SettingsModal: React.FC<React.PropsWithChildren<InjectedModalProps>> = ({ 
                   ml="4px"
                 />
               </Flex>
-              <PancakeToggle checked={audioPlay} onChange={() => setAudioMode((s) => !s)} scale="md" />
+              <PancakeToggle
+                id="toggle-audio-play"
+                checked={audioPlay}
+                onChange={() => setAudioMode((s) => !s)}
+                scale="md"
+              />
+            </Flex>
+            <Flex justifyContent="space-between" alignItems="center" mb="24px">
+              <Flex alignItems="center">
+                <Text>{t('Fast routing (BETA)')}</Text>
+                <QuestionHelper
+                  text={t('Increase the speed of finding best swapping routes')}
+                  placement="top"
+                  ml="4px"
+                />
+              </Flex>
+              <PancakeToggle
+                id="toggle-speed-quote"
+                checked={speedQuote}
+                onChange={() => setSpeedQuote((s) => !s)}
+                scale="md"
+              />
             </Flex>
             <RoutingSettingsButton />
           </>
@@ -255,6 +326,7 @@ export function RoutingSettingsButton({
   const [show, setShow] = useState(false)
   const { t } = useTranslation()
   const [isRoutingSettingChange] = useRoutingSettingChanged()
+  const handleDismiss = useCallback(() => setShow(false), [])
   return (
     <>
       <AtomBox textAlign="center">
@@ -264,7 +336,7 @@ export function RoutingSettingsButton({
           </Button>
         </NotificationDot>
       </AtomBox>
-      <ModalV2 isOpen={show} onDismiss={() => setShow(false)} closeOnOverlayClick>
+      <ModalV2 isOpen={show} onDismiss={handleDismiss} closeOnOverlayClick>
         <RoutingSettings />
       </ModalV2>
     </>

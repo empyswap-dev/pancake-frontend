@@ -1,21 +1,20 @@
-import { parseEther } from 'viem'
 import { SerializedFarmsState } from '@pancakeswap/farms'
-import { Token } from '@pancakeswap/sdk'
 import { SerializedPoolWithInfo } from '@pancakeswap/pools'
-import { Address } from 'wagmi'
+import { BetPosition, PredictionStatus, PredictionsChartView } from '@pancakeswap/prediction'
 import BigNumber from 'bignumber.js'
 import {
   CampaignType,
-  TFetchStatus,
   LotteryStatus,
   LotteryTicket,
+  TFetchStatus,
   Team,
   TranslatableText,
 } from 'config/constants/types'
+import { Address, parseEther } from 'viem'
 import { NftToken } from './nftMarket/types'
 
 export enum GAS_PRICE {
-  default = '3',
+  default = '1',
   fast = '4',
   instant = '5',
   testnet = '10',
@@ -132,15 +131,15 @@ export interface DeserializedLockedCakeVault extends Omit<DeserializedCakeVault,
 
 export interface SerializedLockedCakeVault extends Omit<SerializedCakeVault, 'userData'> {
   totalLockedAmount?: SerializedBigNumber
-  userData?: SerializedLockedVaultUser
+  userData: SerializedLockedVaultUser
 }
 
 export interface SerializedCakeVault {
   totalShares?: SerializedBigNumber
   pricePerFullShare?: SerializedBigNumber
   totalCakeInVault?: SerializedBigNumber
-  fees?: SerializedVaultFees
-  userData?: SerializedVaultUser
+  fees: SerializedVaultFees
+  userData: SerializedVaultUser
 }
 
 // Ifo
@@ -176,29 +175,6 @@ export interface Achievement {
 
 // Predictions
 
-export enum BetPosition {
-  BULL = 'Bull',
-  BEAR = 'Bear',
-  HOUSE = 'House',
-}
-
-export enum PredictionStatus {
-  INITIAL = 'initial',
-  LIVE = 'live',
-  PAUSED = 'paused',
-  ERROR = 'error',
-}
-
-export enum PredictionSupportedSymbol {
-  BNB = 'BNB',
-  CAKE = 'CAKE',
-}
-
-export enum PredictionsChartView {
-  TradingView = 'TradingView',
-  Chainlink = 'Chainlink Oracle',
-}
-
 export interface Round {
   id: string
   epoch: number
@@ -224,6 +200,8 @@ export interface Round {
   bearBets: number
   bearAmount: number
   bets?: Bet[]
+
+  AIPrice?: number
 }
 
 export interface Market {
@@ -308,8 +286,13 @@ export interface ReduxNodeRound {
   rewardBaseCalAmount: string
   rewardAmount: string
   oracleCalled: boolean
-  lockOracleId: string | null
-  closeOracleId: string | null
+
+  // PredictionsV2
+  lockOracleId?: string | null
+  closeOracleId?: string | null
+
+  // AI Predictions
+  AIPrice?: string | null
 }
 
 export interface NodeRound {
@@ -325,8 +308,13 @@ export interface NodeRound {
   rewardBaseCalAmount: bigint | null
   rewardAmount: bigint | null
   oracleCalled: boolean
-  closeOracleId: string | null
-  lockOracleId: string | null
+
+  // PredictionsV2
+  lockOracleId?: string | null
+  closeOracleId?: string | null
+
+  // AI Predictions
+  AIPrice?: bigint | null
 }
 
 export type LeaderboardFilterTimePeriod = '1d' | '7d' | '1m' | 'all'
@@ -414,6 +402,7 @@ export interface Proposal {
   start: number
   state: ProposalState
   title: string
+  ipfs: string
 }
 
 export interface Vote {
@@ -428,6 +417,7 @@ export interface Vote {
     votingPower: string
   }
   vp: number
+  ipfs: string
 }
 
 export interface LotteryRoundUserTickets {
@@ -471,7 +461,7 @@ export interface LotteryState {
   isTransitioning: boolean
   currentRound: LotteryResponse & { userTickets?: LotteryRoundUserTickets }
   lotteriesData?: LotteryRoundGraphEntity[]
-  userLotteryData?: LotteryUserGraphEntity
+  userLotteryData: LotteryUserGraphEntity
 }
 
 export interface LotteryRoundGraphEntity {
@@ -502,17 +492,9 @@ export interface UserRound {
   tickets?: LotteryTicket[]
 }
 
-export interface PredictionConfig {
-  address: Address
-  api: string
-  chainlinkOracleAddress: Address
-  displayedDecimals: number
-  token: Token
-}
-
 // Pottery
 export interface PotteryState {
-  lastVaultAddress: Address
+  lastVaultAddress: Address | null
   publicData: SerializedPotteryPublicData
   userData: SerializedPotteryUserData
   finishedRoundInfo: PotteryRoundInfo

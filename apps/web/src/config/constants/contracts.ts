@@ -1,7 +1,10 @@
 import { ChainId } from '@pancakeswap/chains'
 import { masterChefV3Addresses } from '@pancakeswap/farms'
-import { DEPLOYER_ADDRESSES } from '@pancakeswap/v3-sdk'
-import { V3_QUOTER_ADDRESSES } from '@pancakeswap/smart-router/evm'
+import { GAUGES_ADDRESS, GAUGES_CALC_ADDRESS } from '@pancakeswap/gauges'
+import { ICAKE } from '@pancakeswap/ifos'
+import { CAKE_VAULT } from '@pancakeswap/pools'
+import { V3_QUOTER_ADDRESSES } from '@pancakeswap/smart-router'
+import { DEPLOYER_ADDRESSES, NFT_POSITION_MANAGER_ADDRESSES } from '@pancakeswap/v3-sdk'
 
 export default {
   masterChef: {
@@ -40,6 +43,11 @@ export default {
   pancakeProfile: {
     [ChainId.BSC]: '0xDf4dBf6536201370F95e06A0F8a7a70fE40E388a',
     [ChainId.BSC_TESTNET]: '0x4B683C7E13B6d5D7fd1FeA9530F451954c1A7c8A',
+  },
+  pancakeProfileProxy: {
+    [ChainId.ARBITRUM_ONE]: '0x5A3526891D6216DAe42d3e17a545A45f854F2213',
+    [ChainId.ETHEREUM]: '0xeA08f9e4267e30721D755A46Bcaddbf993d8C59B',
+    [ChainId.ZKSYNC]: '0xb6700cC1ab23BeB00c88496EAAA344fba31Ff895',
   },
   pancakeBunnies: {
     [ChainId.BSC]: '0xDf7952B35f24aCF7fC0487D01c8d5690a60DBa07',
@@ -81,29 +89,10 @@ export default {
     [ChainId.BSC]: '0x23c41D28A239dDCAABd1bb1deF8d057189510066',
     [ChainId.BSC_TESTNET]: '0x24ec6962dbe874F6B67B5C50857565667fA0854F',
   },
-  cakeVault: {
-    [ChainId.BSC]: '0x45c54210128a065de780C4B0Df3d16664f7f859e',
-    [ChainId.BSC_TESTNET]: '0x1088Fb24053F03802F673b84d16AE1A7023E400b',
-  },
+  cakeVault: CAKE_VAULT,
   cakeFlexibleSideVault: {
     [ChainId.BSC]: '0x615e896A8C2CA8470A2e9dc2E9552998f8658Ea0',
     [ChainId.BSC_TESTNET]: '0x1088Fb24053F03802F673b84d16AE1A7023E400b',
-  },
-  predictionsBNB: {
-    [ChainId.BSC]: '0x18B2A687610328590Bc8F2e5fEdDe3b582A49cdA',
-    [ChainId.BSC_TESTNET]: '0x',
-  },
-  predictionsCAKE: {
-    [ChainId.BSC]: '0x0E3A8078EDD2021dadcdE733C6b4a86E51EE8f07',
-    [ChainId.BSC_TESTNET]: '0x',
-  },
-  chainlinkOracleBNB: {
-    [ChainId.BSC]: '0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE',
-    [ChainId.BSC_TESTNET]: '0x',
-  },
-  chainlinkOracleCAKE: {
-    [ChainId.BSC]: '0xB6064eD41d4f67e353768aA239cA86f4F73665a1',
-    [ChainId.BSC_TESTNET]: '0x',
   },
   predictionsV1: {
     [ChainId.BSC]: '0x516ffd7D1e0Ca40b1879935B2De87cb20Fc1124b',
@@ -153,10 +142,7 @@ export default {
     [ChainId.BSC]: '0x52E5D1e24A4308ef1A221C949cb2F7cbbAFEE090',
     [ChainId.BSC_TESTNET]: '0x6e4B1D7C65E86f1723720a5fE8993f0908108b64',
   },
-  iCake: {
-    [ChainId.BSC]: '0x3C458828D1622F5f4d526eb0d24Da8C4Eb8F07b1',
-    [ChainId.BSC_TESTNET]: '0x',
-  },
+  iCake: ICAKE,
   bCakeFarmBooster: {
     [ChainId.BSC]: '0xE4FAa3Ef5A9708C894435B0F39c2B440936A3A52',
     [ChainId.BSC_TESTNET]: '0x',
@@ -165,11 +151,7 @@ export default {
     [ChainId.BSC]: '0x2C36221bF724c60E9FEE3dd44e2da8017a8EF3BA',
     [ChainId.BSC_TESTNET]: '0x',
   },
-  bCakeFarmBoosterV3: {
-    [ChainId.BSC]: '0x695170faE243147b3bEB4C43AA8DE5DcD9202752',
-    [ChainId.BSC_TESTNET]: '0x56666300A1E25624489b661f3C6c456c159a109a',
-  },
-  nonBscVault: {
+  crossFarmingVault: {
     [ChainId.ETHEREUM]: '0x2e71B2688019ebdFDdE5A45e6921aaebb15b25fb',
     [ChainId.GOERLI]: '0xE6c904424417D03451fADd6E3f5b6c26BcC43841',
   },
@@ -188,28 +170,10 @@ export default {
   },
   tradingReward: {
     [ChainId.ETHEREUM]: '0x',
-    [ChainId.BSC]: '0xa842a4AD40FEbbd034fbeF25C7a880464a90e695',
+    [ChainId.BSC]: '0xFd30b4fec42Cf0eA9beAeef0097A1071cA71FfCC',
     [ChainId.BSC_TESTNET]: '0x',
   },
-  nftPositionManager: {
-    [ChainId.ETHEREUM]: '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364',
-    [ChainId.GOERLI]: '0x427bF5b37357632377eCbEC9de3626C71A5396c1',
-    [ChainId.BSC]: '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364',
-    [ChainId.BSC_TESTNET]: '0x427bF5b37357632377eCbEC9de3626C71A5396c1',
-    [ChainId.ZKSYNC_TESTNET]: '0xF84697CfE7c88F846e4ba5dAe14A6A8f67deF5c2',
-    [ChainId.ZKSYNC]: '0xa815e2eD7f7d5B0c49fda367F249232a1B9D2883',
-    [ChainId.POLYGON_ZKEVM]: '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364',
-    [ChainId.POLYGON_ZKEVM_TESTNET]: '0x1f489dd5B559E976AE74303F939Cfd0aF1b62C2B',
-    [ChainId.ARBITRUM_ONE]: '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364',
-    [ChainId.LINEA]: '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364',
-    [ChainId.LINEA_TESTNET]: '0xacFa791C833120c769Fd3066c940B7D30Cd8BC73',
-    [ChainId.ARBITRUM_GOERLI]: '0xb10120961f7504766976A89E29802Fa00553da5b',
-    [ChainId.OPBNB]: '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364',
-    [ChainId.OPBNB_TESTNET]: '0x9d4277f1D41CCB30C0e91f7d1bBA2A739E19032C',
-    [ChainId.BASE]: '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364',
-    [ChainId.BASE_TESTNET]: '0x0F81fD8DaC20A21029B496D8F8E08385201B8ca0',
-    [ChainId.SCROLL_SEPOLIA]: '0x0F81fD8DaC20A21029B496D8F8E08385201B8ca0',
-  },
+  nftPositionManager: NFT_POSITION_MANAGER_ADDRESSES,
   v3PoolDeployer: DEPLOYER_ADDRESSES,
   v3Migrator: {
     [ChainId.ETHEREUM]: '0xbC203d7f83677c7ed3F7acEc959963E7F4ECC5C2',
@@ -229,6 +193,7 @@ export default {
     [ChainId.BASE]: '0xbC203d7f83677c7ed3F7acEc959963E7F4ECC5C2',
     [ChainId.BASE_TESTNET]: '0x8Ae8592a24CD13b7E09D2763E7d6A39E3c0D6bad',
     [ChainId.SCROLL_SEPOLIA]: '0x8Ae8592a24CD13b7E09D2763E7d6A39E3c0D6bad',
+    [ChainId.SEPOLIA]: '0xbC203d7f83677c7ed3F7acEc959963E7F4ECC5C2',
   },
   quoter: V3_QUOTER_ADDRESSES,
   v3Airdrop: {
@@ -264,5 +229,33 @@ export default {
     [ChainId.ETHEREUM]: '0x',
     [ChainId.BSC]: '0xC0E92c9B437734a0c0e0466F76cDf71c5478b0AB',
     [ChainId.BSC_TESTNET]: '0x',
+  },
+  veCake: {
+    [ChainId.BSC]: '0x5692DB8177a81A6c6afc8084C2976C9933EC1bAB',
+    [ChainId.BSC_TESTNET]: '0x4879fcB447E7F4c7843A6D15dF5526061304dcFb',
+    [ChainId.ARBITRUM_ONE]: '0xF4C31dfEB3C0A2203472A3e20e49B1EFE4bD588d',
+    [ChainId.ETHEREUM]: '0x0aC4ED1D63c51f2b35C555eE09b425f08E6eA556',
+    [ChainId.ZKSYNC]: '0x77AbEA6a2FAa1938723411B28A0863be34f3c89f',
+  },
+  pancakeVeSenderV2: {
+    [ChainId.BSC]: '0xEF58528Ecb76b69a0F61F65d94797d531B34cf64',
+  },
+  gaugesVoting: GAUGES_ADDRESS,
+  gaugesVotingCalc: GAUGES_CALC_ADDRESS,
+  revenueSharingVeCake: {
+    [ChainId.BSC]: '0xCaF4e48a4Cb930060D0c3409F40Ae7b34d2AbE2D',
+    [ChainId.BSC_TESTNET]: '0x58fde4bf684B631363640808F452952D8c14084b',
+  },
+  revenueSharingCakePool: {
+    [ChainId.BSC]: '0x9cac9745731d1Cf2B483f257745A512f0938DD01',
+    [ChainId.BSC_TESTNET]: '0x482a401D57C9892D6d6BD6A4A976CfDDeD83BF11',
+  },
+  revenueSharingPoolGateway: {
+    [ChainId.BSC]: '0x011f2a82846a4E9c62C2FC4Fd6fDbad19147D94A',
+    [ChainId.BSC_TESTNET]: '0x946273012ED616410F698536F1BF2513417BF8Ec',
+  },
+  zkSyncAirDrop: {
+    [ChainId.ZKSYNC_TESTNET]: '0xbfcCF87Ee5cd03d4550Cc1526Bf152cc2EE1C7AB',
+    [ChainId.ZKSYNC]: '0xB774c13bA5a665713037c42A12f0ED9De70585cB',
   },
 } as const satisfies Record<string, Record<number, `0x${string}`>>

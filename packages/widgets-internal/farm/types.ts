@@ -1,6 +1,7 @@
-import { ReactNode } from "react";
-import BigNumber from "bignumber.js";
 import { Token } from "@pancakeswap/sdk";
+import BigNumber from "bignumber.js";
+import { ReactNode } from "react";
+import { Address } from "viem";
 
 export interface FarmTableEarnedProps {
   earnings: number;
@@ -33,6 +34,12 @@ export interface FarmTableFarmTokenInfoProps {
   isStaking?: boolean;
   children?: ReactNode;
   isCommunity?: boolean;
+  merklLink?: string;
+  hasBothFarmAndMerkl?: boolean;
+  lpAddress?: Address;
+  merklApr?: number;
+  rewardCakePerSecond?: number;
+  merklUserLink?: string;
 }
 
 export type ColumnsDefTypes = {
@@ -93,6 +100,12 @@ export const DesktopColumnSchema: ColumnsDefTypes[] = [
     name: "apr",
     sortable: true,
     label: "APR",
+  },
+  {
+    id: 8,
+    name: "rewardPerDay",
+    sortable: true,
+    label: "",
   },
   {
     id: 5,

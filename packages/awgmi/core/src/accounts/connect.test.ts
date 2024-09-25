@@ -20,7 +20,7 @@ describe('connect', () => {
         {
           "account": {
             "address": "0x2cf744dc90acb87c3bbf5f034b37c3718ac10a56e5181c1b43923e5c3623b493",
-            "publicKey": "0x8ecf7d835b65f8a7252ec49563b84b37f37c76077962ccfef752fd0b8bb960",
+            "publicKey": "0x008ecf7d835b65f8a7252ec49563b84b37f37c76077962ccfef752fd0b8bb960",
           },
           "connector": "<MockConnector>",
           "network": "devnet",
@@ -37,7 +37,7 @@ describe('connect', () => {
         {
           "account": {
             "address": "0x2cf744dc90acb87c3bbf5f034b37c3718ac10a56e5181c1b43923e5c3623b493",
-            "publicKey": "0x8ecf7d835b65f8a7252ec49563b84b37f37c76077962ccfef752fd0b8bb960",
+            "publicKey": "0x008ecf7d835b65f8a7252ec49563b84b37f37c76077962ccfef752fd0b8bb960",
           },
           "connector": "<MockConnector>",
           "network": "devnet",
@@ -55,7 +55,9 @@ describe('connect', () => {
 
     it('is already connected', async () => {
       await connect({ connector })
-      await expect(connect({ connector })).rejects.toThrowErrorMatchingInlineSnapshot(`"Connector already connected"`)
+      await expect(connect({ connector })).rejects.toThrowErrorMatchingInlineSnapshot(
+        `[ConnectorAlreadyConnectedError: Connector already connected]`,
+      )
     })
 
     it('throws when user rejects request', async () => {
@@ -68,7 +70,7 @@ describe('connect', () => {
             },
           }),
         }),
-      ).rejects.toThrowErrorMatchingInlineSnapshot(`"User rejected request"`)
+      ).rejects.toThrowErrorMatchingInlineSnapshot(`[UserRejectedRequestError: User rejected request]`)
       expect(getClient().status).toEqual('disconnected')
     })
 

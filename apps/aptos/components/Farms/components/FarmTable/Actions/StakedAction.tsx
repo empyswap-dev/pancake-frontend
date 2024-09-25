@@ -1,12 +1,15 @@
-import { useAccountBalance } from '@pancakeswap/awgmi'
+import { useBalance } from '@pancakeswap/awgmi'
 import { TransactionResponse } from '@pancakeswap/awgmi/core'
 import type { DeserializedFarmUserData } from '@pancakeswap/farms'
+import { FarmWithStakedValue } from '@pancakeswap/farms'
 import { useTranslation } from '@pancakeswap/localization'
 import { useModal, useToast } from '@pancakeswap/uikit'
-import { FarmWidget } from '@pancakeswap/widgets-internal'
 import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
+import { FarmWidget } from '@pancakeswap/widgets-internal'
 import BigNumber from 'bignumber.js'
 import { ConnectWalletButton } from 'components/ConnectWalletButton'
+import { FARM_DEFAULT_DECIMALS } from 'components/Farms/constants'
+import { useCheckIsUserIpPass } from 'components/Farms/hooks/useCheckIsUserIpPass'
 import { ToastDescriptionWithTx } from 'components/Toast'
 import { BASE_ADD_LIQUIDITY_URL } from 'config'
 import useActiveWeb3React from 'hooks/useActiveWeb3React'
@@ -14,9 +17,8 @@ import useCatchTxError from 'hooks/useCatchTxError'
 import { usePriceCakeUsdc } from 'hooks/useStablePrice'
 import { useRouter } from 'next/router'
 import { useMemo } from 'react'
-import { FARM_DEFAULT_DECIMALS } from 'components/Farms/constants'
+import { logGTMClickStakeFarmEvent, logGTMClickUnStakeFarmEvent } from 'utils/customGTMEventTracking'
 import getLiquidityUrlPathParts from 'utils/getLiquidityUrlPathParts'
-import { FarmWithStakedValue } from '@pancakeswap/farms'
 import useStakeFarms from '../../../hooks/useStakeFarms'
 import useUnstakeFarms from '../../../hooks/useUnstakeFarms'
 
@@ -24,6 +26,8 @@ interface StackedActionProps extends FarmWithStakedValue {
   userDataReady: boolean
   lpLabel?: string
   displayApr?: string
+  farmCakePerSecond?: string
+  totalMultipliers?: string
   onStake: (value: string) => Promise<TransactionResponse>
   onUnstake: (value: string) => Promise<TransactionResponse>
 }
@@ -41,7 +45,7 @@ export function useStakedActions(tokenType) {
 export const StakedContainer = ({ children, ...props }) => {
   const { onStake, onUnstake } = useStakedActions(props.lpAddress)
   const { account } = useActiveWeb3React()
-  const { data: tokenBalance = BIG_ZERO } = useAccountBalance({
+  const { data: tokenBalance = BIG_ZERO } = useBalance({
     watch: true,
     address: account,
     coin: props.lpAddress,
@@ -79,6 +83,10 @@ const Staked: React.FunctionComponent<React.PropsWithChildren<StackedActionProps
   tokenAmountTotal = BIG_ZERO,
   quoteTokenAmountTotal = BIG_ZERO,
   userData,
+  dualTokenRewardApr,
+  farmCakePerSecond,
+  totalMultipliers,
+  lpRewardsApr,
   onStake,
   onUnstake,
 }) => {
@@ -86,6 +94,7 @@ const Staked: React.FunctionComponent<React.PropsWithChildren<StackedActionProps
   const { toastSuccess } = useToast()
   const { fetchWithCatchTxError } = useCatchTxError()
   const { account } = useActiveWeb3React()
+  const isUserIpPass = useCheckIsUserIpPass()
 
   const { stakedBalance, tokenBalance } = (userData as DeserializedFarmUserData) || {}
 
@@ -112,6 +121,7 @@ const Staked: React.FunctionComponent<React.PropsWithChildren<StackedActionProps
         </ToastDescriptionWithTx>,
       )
     }
+    logGTMClickStakeFarmEvent()
   }
 
   const handleUnstake = async (amount: string) => {
@@ -124,7 +134,17 @@ const Staked: React.FunctionComponent<React.PropsWithChildren<StackedActionProps
         </ToastDescriptionWithTx>,
       )
     }
+    logGTMClickUnStakeFarmEvent()
   }
+
+  const combineApr = useMemo(() => {
+    let total = new BigNumber(apr ?? 0).plus(lpRewardsApr ?? 0)
+    if (dualTokenRewardApr) {
+      total = new BigNumber(apr ?? 0).plus(lpRewardsApr ?? 0).plus(dualTokenRewardApr)
+    }
+
+    return total.toNumber()
+  }, [apr, dualTokenRewardApr, lpRewardsApr])
 
   const [onPresentDeposit] = useModal(
     <FarmWidget.DepositModal
@@ -134,7 +154,8 @@ const Staked: React.FunctionComponent<React.PropsWithChildren<StackedActionProps
       max={tokenBalance}
       lpPrice={lpTokenPrice}
       lpLabel={lpLabel}
-      apr={apr}
+      apr={combineApr}
+      lpRewardsApr={lpRewardsApr}
       displayApr={displayApr}
       stakedBalance={stakedBalance}
       onConfirm={handleStake}
@@ -143,6 +164,17 @@ const Staked: React.FunctionComponent<React.PropsWithChildren<StackedActionProps
       addLiquidityUrl={addLiquidityUrl}
       cakePrice={cakePrice}
       decimals={FARM_DEFAULT_DECIMALS}
+      dualTokenRewardApr={dualTokenRewardApr}
+      farmCakePerSecond={farmCakePerSecond}
+      totalMultipliers={totalMultipliers}
+      rewardCakePerSecond
+      showTopMessageText={
+        isUserIpPass
+          ? null
+          : t(
+              'The CAKE and APT Farm rewards for this pool will not be applicable to or claimable by U.S.-based and VPN users.',
+            )
+      }
     />,
   )
 

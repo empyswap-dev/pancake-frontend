@@ -1,12 +1,14 @@
-import { useTranslation } from '@pancakeswap/localization'
-import { LinkExternal, Text, useMatchBreakpoints, Flex } from '@pancakeswap/uikit'
-import { FarmWidget } from '@pancakeswap/widgets-internal'
-import { styled, css, keyframes } from 'styled-components'
-import getLiquidityUrlPathParts from 'utils/getLiquidityUrlPathParts'
 import { FarmWithStakedValue } from '@pancakeswap/farms'
+import { useTranslation } from '@pancakeswap/localization'
+import { Flex, LinkExternal, Text, useMatchBreakpoints } from '@pancakeswap/uikit'
+import { FarmWidget } from '@pancakeswap/widgets-internal'
+import { getDisplayFarmCakePerSecond } from 'components/Farms/components/getDisplayFarmCakePerSecond'
+import { useFarms } from 'state/farms/hook'
+import { css, keyframes, styled } from 'styled-components'
+import getLiquidityUrlPathParts from 'utils/getLiquidityUrlPathParts'
 
 import Apr, { AprProps } from '../Apr'
-import { HarvestAction, HarvestActionContainer } from './HarvestAction'
+import { HarvestActionContainer, TableHarvestAction } from './HarvestAction'
 import StakedAction, { StakedContainer } from './StakedAction'
 
 const { Multiplier, Liquidity } = FarmWidget.FarmTable
@@ -19,6 +21,9 @@ export interface ActionPanelProps {
   userDataReady: boolean
   expanded: boolean
   alignLinksToRight?: boolean
+  isLastFarm: boolean
+  farmCakePerSecond?: string
+  totalMultipliers?: string
 }
 
 const expandAnimation = keyframes`
@@ -39,7 +44,7 @@ const collapseAnimation = keyframes`
   }
 `
 
-const Container = styled.div<{ expanded }>`
+const Container = styled.div<{ expanded; isLastFarm }>`
   animation: ${({ expanded }) =>
     expanded
       ? css`
@@ -60,6 +65,7 @@ const Container = styled.div<{ expanded }>`
     align-items: center;
     padding: 16px 32px;
   }
+  ${({ isLastFarm }) => isLastFarm && `border-radius: 0 0 16px 16px;`}
 `
 
 const StyledLinkExternal = styled(LinkExternal)`
@@ -81,7 +87,7 @@ const ActionContainer = styled.div`
   display: flex;
   flex-direction: column;
 
-  ${({ theme }) => theme.mediaQueries.sm} {
+  ${({ theme }) => theme.mediaQueries.md} {
     flex-direction: row;
     align-items: center;
     flex-grow: 1;
@@ -111,10 +117,10 @@ const ActionPanel: React.FunctionComponent<React.PropsWithChildren<ActionPanelPr
   userDataReady,
   expanded,
   alignLinksToRight = true,
+  isLastFarm,
 }) => {
   const farm = details
   const { isDesktop } = useMatchBreakpoints()
-
   const {
     t,
     currentLanguage: { locale },
@@ -127,8 +133,12 @@ const ActionPanel: React.FunctionComponent<React.PropsWithChildren<ActionPanelPr
     tokenAddress: token?.address,
   })
 
+  const { totalRegularAllocPoint, cakePerBlock } = useFarms()
+  const totalMultipliers = totalRegularAllocPoint ? (Number(totalRegularAllocPoint) / 100).toString() : '0'
+  const farmCakePerSecond = getDisplayFarmCakePerSecond(farm.poolWeight?.toNumber(), cakePerBlock)
+
   return (
-    <Container expanded={expanded}>
+    <Container expanded={expanded} isLastFarm={isLastFarm}>
       <InfoContainer>
         <ValueContainer>
           {farm.isCommunity && farm.auctionHostingEndDate && (
@@ -171,10 +181,23 @@ const ActionPanel: React.FunctionComponent<React.PropsWithChildren<ActionPanelPr
         )}
       </InfoContainer>
       <ActionContainer>
-        <HarvestActionContainer {...farm} userDataReady={userDataReady}>
-          {(props) => <HarvestAction {...props} />}
+        <HarvestActionContainer
+          pid={farm.pid}
+          lpAddress={farm.lpAddress}
+          earnings={farm?.userData?.earnings}
+          dual={farm.dual}
+          earningsDualTokenBalance={farm?.userData?.earningsDualTokenBalance}
+        >
+          {(props) => <TableHarvestAction {...props} />}
         </HarvestActionContainer>
-        <StakedContainer {...farm} userDataReady={userDataReady} lpLabel={lpLabel} displayApr={apr.value}>
+        <StakedContainer
+          {...farm}
+          userDataReady={userDataReady}
+          lpLabel={lpLabel}
+          displayApr={apr.value}
+          farmCakePerSecond={farmCakePerSecond}
+          totalMultipliers={totalMultipliers}
+        >
           {(props) => <StakedAction {...props} />}
         </StakedContainer>
       </ActionContainer>

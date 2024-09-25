@@ -1,41 +1,27 @@
-import { useModal, useMatchBreakpoints } from '@pancakeswap/uikit'
+import { PredictionsChartView } from '@pancakeswap/prediction'
+import { useMatchBreakpoints, useModal } from '@pancakeswap/uikit'
+import { useAccountLocalEventListener } from 'hooks/useAccountLocalEventListener'
 import { useEffect, useRef } from 'react'
 import { useChartView, useIsChartPaneOpen } from 'state/predictions/hooks'
-import { PredictionsChartView } from 'state/types'
-import { useAccountLocalEventListener } from 'hooks/useAccountLocalEventListener'
-import { styled } from 'styled-components'
 import { useUserPredictionChainlinkChartDisclaimerShow, useUserPredictionChartDisclaimerShow } from 'state/user/hooks'
-import { PredictionSubgraphHealthIndicator } from 'components/SubgraphHealthIndicator'
 
-import ChartDisclaimer from './components/ChartDisclaimer'
+import Desktop from './Desktop'
+import Mobile from './Mobile'
 import ChainlinkChartDisclaimer from './components/ChainlinkChartDisclaimer'
+import ChartDisclaimer from './components/ChartDisclaimer'
 import CollectWinningsPopup from './components/CollectWinningsPopup'
 import Container from './components/Container'
 import RiskDisclaimer from './components/RiskDisclaimer'
+import { useConfig } from './context/ConfigProvider'
 import SwiperProvider from './context/SwiperProvider'
-import Desktop from './Desktop'
 import usePollPredictions from './hooks/usePollPredictions'
-import Mobile from './Mobile'
-
-const Decorations = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: url(/images/pottery/bg-star.svg);
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: cover;
-  pointer-events: none;
-  opacity: 0.2;
-`
 
 function Warnings() {
   const [showDisclaimer] = useUserPredictionChartDisclaimerShow()
   const [showChainlinkDisclaimer] = useUserPredictionChainlinkChartDisclaimerShow()
   const isChartPaneOpen = useIsChartPaneOpen()
   const chartView = useChartView()
+  const config = useConfig()
 
   const [onPresentChartDisclaimer] = useModal(<ChartDisclaimer />, false)
   const [onPresentChainlinkChartDisclaimer] = useModal(<ChainlinkChartDisclaimer />, false)
@@ -53,10 +39,21 @@ function Warnings() {
 
   // Chainlink Disclaimer
   useEffect(() => {
-    if (isChartPaneOpen && showChainlinkDisclaimer && chartView === PredictionsChartView.Chainlink) {
+    if (
+      isChartPaneOpen &&
+      showChainlinkDisclaimer &&
+      chartView === PredictionsChartView.Chainlink &&
+      config?.chainlinkOracleAddress
+    ) {
       onPresentChainlinkChartDisclaimerRef.current()
     }
-  }, [onPresentChainlinkChartDisclaimerRef, isChartPaneOpen, showChainlinkDisclaimer, chartView])
+  }, [
+    onPresentChainlinkChartDisclaimerRef,
+    isChartPaneOpen,
+    showChainlinkDisclaimer,
+    chartView,
+    config?.chainlinkOracleAddress,
+  ])
 
   return null
 }
@@ -69,18 +66,14 @@ const Predictions = () => {
   usePollPredictions()
 
   return (
-    <>
-      <Warnings />
-      <RiskDisclaimer />
-      <SwiperProvider>
-        <Container>
-          <Decorations />
-          {isDesktop ? <Desktop /> : <Mobile />}
-          <CollectWinningsPopup />
-        </Container>
-      </SwiperProvider>
-      <PredictionSubgraphHealthIndicator />
-    </>
+    <SwiperProvider>
+      <Container>
+        <Warnings />
+        <RiskDisclaimer />
+        {isDesktop ? <Desktop /> : <Mobile />}
+        <CollectWinningsPopup />
+      </Container>
+    </SwiperProvider>
   )
 }
 

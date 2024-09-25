@@ -1,26 +1,26 @@
 import { useTranslation } from '@pancakeswap/localization'
+import { Currency, CurrencyAmount, Percent } from '@pancakeswap/sdk'
 import {
-  ModalV2,
-  useModalV2,
   Box,
-  PreTitle,
-  IconButton,
+  Button,
   CalculateIcon,
-  RoiCard,
   CalculatorMode,
   Flex,
-  Button,
+  IconButton,
+  ModalV2,
+  PreTitle,
+  RoiCard,
+  useModalV2,
 } from '@pancakeswap/uikit'
-import { CurrencyAmount, Percent, Token } from '@pancakeswap/sdk'
+import { useStablecoinPriceAmount } from 'hooks/useStablecoinPrice'
 import toNumber from 'lodash/toNumber'
-import { useMemo } from 'react'
-import { useStablecoinPriceAmount } from 'hooks/useBUSDPrice'
+import { useCallback, useMemo } from 'react'
 
+import { useCalculateProjectedReturnAmount } from '../hooks/useCalculateProjectedReturnAmount'
+import { useCurrentDay } from '../hooks/useStakedPools'
 import { FixedStakingPool } from '../type'
 import FixedStakingOverview from './FixedStakingOverview'
 import { StakingModalTemplate } from './StakingModalTemplate'
-import { useCurrentDay } from '../hooks/useStakedPools'
-import { useCalculateProjectedReturnAmount } from '../hooks/useCalculateProjectedReturnAmount'
 
 function FixedStakingRoiCard({
   stakeAmount,
@@ -32,12 +32,12 @@ function FixedStakingRoiCard({
   lastDayAction,
   poolEndDay,
 }: {
-  stakeAmount: CurrencyAmount<Token>
+  stakeAmount: CurrencyAmount<Currency>
   lockAPR: Percent
   boostAPR: Percent
   unlockAPR: Percent
   poolEndDay: number
-  lastDayAction?: number
+  lastDayAction: number
   lockPeriod?: number
   isBoost?: boolean
 }) {
@@ -87,15 +87,18 @@ export function FixedStakingCalculator({
   initialLockPeriod,
   hideBackButton,
 }: {
-  stakingToken: Token
+  stakingToken: Currency
   pools: FixedStakingPool[]
-  initialLockPeriod: number
+  initialLockPeriod?: number
   hideBackButton?: boolean
 }) {
   const stakedPeriods = useMemo(() => pools.map((p) => p.lockPeriod), [pools])
 
   const { t } = useTranslation()
   const stakeModal = useModalV2()
+  const handleDismiss = useCallback(() => {
+    stakeModal.onDismiss()
+  }, [stakeModal])
 
   return (
     <>
@@ -110,16 +113,11 @@ export function FixedStakingCalculator({
       >
         <CalculateIcon color="textSubtle" ml="0.25em" width="24px" />
       </IconButton>
-      <ModalV2
-        {...stakeModal}
-        onDismiss={() => {
-          stakeModal.onDismiss()
-        }}
-        closeOnOverlayClick
-      >
+      <ModalV2 {...stakeModal} onDismiss={handleDismiss} closeOnOverlayClick>
         <StakingModalTemplate
+          useNative
           title={t('ROI Calculator')}
-          onBack={hideBackButton ? null : () => stakeModal.onDismiss()}
+          onBack={hideBackButton ? undefined : () => stakeModal.onDismiss()}
           hideStakeButton
           stakingToken={stakingToken}
           pools={pools}

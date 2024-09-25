@@ -1,18 +1,18 @@
 import { useTranslation } from '@pancakeswap/localization'
-import { CardBody, Flex, Heading, Tag, Box, Button, StarCircle } from '@pancakeswap/uikit'
+import { Box, Button, CardBody, Flex, Heading, StarCircle, Tag } from '@pancakeswap/uikit'
 import { Pool } from '@pancakeswap/widgets-internal'
-import CurrencyLogo from 'components/Logo/CurrencyLogo'
 import BigNumber from 'bignumber.js'
-import first from 'lodash/first'
 import { LightGreyCard } from 'components/Card'
 import Divider from 'components/Divider'
+import CurrencyLogo from 'components/Logo/CurrencyLogo'
+import first from 'lodash/first'
 import React from 'react'
 
+import { PoolGroup, StakedPosition } from '../type'
 import { FixedStakingCardBody } from './FixedStakingCardBody'
-import { StakedPositionSection } from './StakedPositionSection'
 import { FixedStakingModal } from './FixedStakingModal'
 import { InlineText } from './InlineText'
-import { StakedPosition, PoolGroup } from '../type'
+import { StakedPositionSection } from './StakedPositionSection'
 
 export function FixedStakingCard({ pool, stakedPositions }: { pool: PoolGroup; stakedPositions: StakedPosition[] }) {
   const { t } = useTranslation()
@@ -26,7 +26,7 @@ export function FixedStakingCard({ pool, stakedPositions }: { pool: PoolGroup; s
             <Heading scale="lg" textAlign="end">
               {pool.token.symbol}
             </Heading>
-            {new BigNumber(first(pool.pools)?.boostDayPercent).gt(0) ? (
+            {new BigNumber(first(pool.pools)?.boostDayPercent || '0').gt(0) ? (
               <Tag outline variant="success" startIcon={<StarCircle width="18px" color="success" />}>
                 {t('Locked Cake Boost')}
               </Tag>
@@ -74,15 +74,17 @@ export function FixedStakingCard({ pool, stakedPositions }: { pool: PoolGroup; s
                 <FixedStakingModal
                   setSelectedPeriodIndex={setSelectedPeriodIndex}
                   key={selectedPeriodIndex}
-                  initialLockPeriod={
-                    selectedPeriodIndex !== null ? pool.pools[selectedPeriodIndex].lockPeriod : undefined
-                  }
+                  initialLockPeriod={selectedPeriodIndex !== null ? pool.pools[selectedPeriodIndex].lockPeriod : 0}
                   pools={pool.pools}
                   stakingToken={pool.token}
                   stakedPositions={stakedPositions}
                 >
                   {(openModal, hideStakeButton) =>
-                    hideStakeButton ? null : <Button onClick={openModal}>{t('Stake')}</Button>
+                    hideStakeButton ? null : (
+                      <Button disabled onClick={openModal}>
+                        {t('Stake')}
+                      </Button>
+                    )
                   }
                 </FixedStakingModal>
               ) : null}

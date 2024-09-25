@@ -1,13 +1,23 @@
-import { useChainCurrentBlock } from 'state/block/hooks'
-import { useActiveIfoWithBlocks } from 'hooks/useActiveIfoWithBlocks'
-import { ChainId } from '@pancakeswap/chains'
+import dayjs from 'dayjs'
+
+import { useActiveIfoWithTimestamps } from 'hooks/useActiveIfoWithTimestamps'
+import { useActiveIfoConfig, useActiveIfoConfigAcrossChains } from 'hooks/useIfoConfig'
 
 const useIsRenderIfoBanner = () => {
-  const currentBlock = useChainCurrentBlock(ChainId.BSC)
+  const ifo = useActiveIfoWithTimestamps()
 
-  const activeIfoWithBlocks = useActiveIfoWithBlocks()
+  return !!(ifo && dayjs().isBefore(dayjs.unix(ifo.endTimestamp)))
+}
 
-  return !!(currentBlock && activeIfoWithBlocks && activeIfoWithBlocks.endBlock > currentBlock)
+/**
+ * Alternative to useIsRenderIfoBanner that uses the end timestamp from ifo config
+ * to determine if the IFO banner should be displayed.
+ * This is potentially useful for slower connections.
+ */
+export const useIsRenderIfoBannerFromConfig = () => {
+  const ifoConfig = useActiveIfoConfigAcrossChains()
+
+  return !!(ifoConfig && ifoConfig?.plannedEndTime && dayjs().isBefore(dayjs.unix(ifoConfig?.plannedEndTime)))
 }
 
 export default useIsRenderIfoBanner

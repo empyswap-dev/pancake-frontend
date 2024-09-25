@@ -1,16 +1,16 @@
 import { useTranslation } from '@pancakeswap/localization'
-import { CurrencyAmount, Percent, Token } from '@pancakeswap/swap-sdk-core'
+import { Currency, CurrencyAmount, Percent } from '@pancakeswap/swap-sdk-core'
 import { Box, Button, Flex, Message, MessageText, Modal, ModalV2, PreTitle, Text, useModalV2 } from '@pancakeswap/uikit'
 import { LightCard } from 'components/Card'
 import { ReactNode, useMemo } from 'react'
 
-import { FixedStakingPool, StakePositionUserInfo, UnstakeType } from '../type'
 import { useHandleWithdrawSubmission } from '../hooks/useHandleWithdrawSubmission'
-import FixedStakingOverview from './FixedStakingOverview'
+import { useShouldNotAllowWithdraw } from '../hooks/useStakedPools'
+import { FixedStakingPool, StakePositionUserInfo, UnstakeType } from '../type'
 import { AmountWithUSDSub } from './AmountWithUSDSub'
 import { FixedStakingCalculator } from './FixedStakingCalculator'
+import FixedStakingOverview from './FixedStakingOverview'
 import { ModalTitle } from './ModalTitle'
-import { useShouldNotAllowWithdraw } from '../hooks/useStakedPools'
 
 export function UnstakeBeforeEnededModal({
   token,
@@ -32,7 +32,7 @@ export function UnstakeBeforeEnededModal({
   poolEndDay: number
   boostAPR: Percent
   unlockAPR: Percent
-  token: Token
+  token: Currency
   lockPeriod: number
   lockAPR: Percent
   stakePositionUserInfo: StakePositionUserInfo
@@ -54,7 +54,7 @@ export function UnstakeBeforeEnededModal({
     [stakePositionUserInfo.accrueInterest, token],
   )
 
-  const feePercent = useMemo(() => new Percent(withdrawalFee, 10000), [withdrawalFee])
+  const feePercent = useMemo(() => new Percent(withdrawalFee ?? 0, 10000), [withdrawalFee])
 
   const withdrawFee = useMemo(
     () => amountDeposit.multiply(feePercent).add(accrueInterest),
@@ -84,14 +84,14 @@ export function UnstakeBeforeEnededModal({
         <Modal
           title={<ModalTitle token={token} tokenTitle={token.symbol} lockPeriod={lockPeriod} />}
           width={['100%', '100%', '420px']}
-          maxWidth={['100%', , '420px']}
+          maxWidth={['100%', null, '420px']}
         >
           <PreTitle mb="4px">{t('Unstake Overview')}</PreTitle>
           <LightCard mb="16px">
             <Flex justifyContent="space-between">
               <Box>
                 <Text fontSize="12px" textTransform="uppercase" bold color="textSubtle">
-                  {t('Commission')}
+                  {t('Withdrawal Fee')}
                 </Text>
                 <Text color="#D67E0A" fontSize="20px" bold mb="-4px">
                   {withdrawFee.toSignificant(2)} {token.symbol}

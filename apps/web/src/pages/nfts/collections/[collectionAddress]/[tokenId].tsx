@@ -1,23 +1,12 @@
 import IndividualNFT from 'views/Nft/market/Collection/IndividualNFTPage'
 import { Address } from 'viem'
-import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from 'next'
+import { GetStaticPaths, GetStaticProps } from 'next'
 import { getCollection, getNftApi } from 'state/nftMarket/helpers'
-import { NftToken } from 'state/nftMarket/types'
 // eslint-disable-next-line camelcase
-import { SWRConfig, unstable_serialize } from 'swr'
-import SubMenu from 'views/Nft/market/components/SubMenu'
+import { dehydrate, QueryClient } from '@tanstack/react-query'
 
-const IndividualNFTPage = ({ fallback = {} }: InferGetStaticPropsType<typeof getStaticProps>) => {
-  return (
-    <SWRConfig
-      value={{
-        fallback,
-      }}
-    >
-      <SubMenu />
-      <IndividualNFT />
-    </SWRConfig>
-  )
+const IndividualNFTPage = () => {
+  return <IndividualNFT />
 }
 
 export const getStaticPaths: GetStaticPaths = async () => {
@@ -28,7 +17,9 @@ export const getStaticPaths: GetStaticPaths = async () => {
 }
 
 export const getStaticProps: GetStaticProps = async ({ params }) => {
-  const { collectionAddress, tokenId } = params
+  const queryClient = new QueryClient()
+  const collectionAddress = params?.collectionAddress
+  const tokenId = params?.tokenId
 
   if (typeof collectionAddress !== 'string' || typeof tokenId !== 'string') {
     return {
@@ -37,7 +28,6 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
   }
 
   const metadata = await getNftApi(collectionAddress, tokenId)
-  const collection = await getCollection(collectionAddress)
   if (!metadata) {
     return {
       notFound: true,
@@ -45,24 +35,33 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
     }
   }
 
-  const nft: NftToken = {
-    tokenId,
-    collectionAddress: collectionAddress as Address,
-    collectionName: metadata.collection.name,
-    name: metadata.name,
-    description: metadata.description,
-    image: metadata.image,
-    attributes: metadata.attributes,
+  const collection = await getCollection(collectionAddress)
+
+  if (collection) {
+    await queryClient.prefetchQuery({
+      queryKey: ['nftMarket', 'collections', collectionAddress.toLowerCase()],
+      queryFn: () => collection,
+    })
   }
+
+  await queryClient.prefetchQuery({
+    queryKey: ['nft', collectionAddress, tokenId],
+    queryFn: async () => {
+      return {
+        tokenId,
+        collectionAddress: collectionAddress as Address,
+        collectionName: collection?.[collectionAddress.toLowerCase()]?.name || metadata.collection.name,
+        name: metadata.name,
+        description: metadata.description,
+        image: metadata.image,
+        attributes: metadata.attributes,
+      }
+    },
+  })
 
   return {
     props: {
-      fallback: {
-        [unstable_serialize(['nft', nft.collectionAddress, nft.tokenId])]: nft,
-        ...(collection && {
-          [unstable_serialize(['nftMarket', 'collections', collectionAddress.toLowerCase()])]: collection,
-        }),
-      },
+      dehydratedState: dehydrate(queryClient),
     },
     revalidate: 60 * 60 * 6, // 6 hours
   }

@@ -1,17 +1,16 @@
-import { useEffect, useState, useMemo } from 'react'
-import { AutoRenewIcon, Box, Button, Flex, Modal, Text, useToast, ModalV2 } from '@pancakeswap/uikit'
-import confetti from 'canvas-confetti'
 import { useTranslation } from '@pancakeswap/localization'
-import delay from 'lodash/delay'
-import { styled } from 'styled-components'
+import { AutoRenewIcon, Box, Button, Flex, Modal, ModalV2, Text, useToast } from '@pancakeswap/uikit'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import confetti from 'canvas-confetti'
 import Dots from 'components/Loader/Dots'
-import useSWRImmutable from 'swr/immutable'
-import { useAccount } from 'wagmi'
+import { ToastDescriptionWithTx } from 'components/Toast'
 import useCatchTxError from 'hooks/useCatchTxError'
 import { useV3AirdropContract } from 'hooks/useContract'
-import { ToastDescriptionWithTx } from 'components/Toast'
-import { useSWRConfig } from 'swr'
 import { useShowOnceAirdropModal } from 'hooks/useShowOnceAirdropModal'
+import delay from 'lodash/delay'
+import { useEffect, useMemo, useState } from 'react'
+import { styled } from 'styled-components'
+import { useAccount } from 'wagmi'
 import useAirdropModalStatus from './hooks/useAirdropModalStatus'
 
 const Image = styled.img`
@@ -61,7 +60,7 @@ const V3AirdropModal: React.FC = () => {
   const { address: account } = useAccount()
   const { toastSuccess, toastError } = useToast()
   const { fetchWithCatchTxError } = useCatchTxError()
-  const { mutate } = useSWRConfig()
+  const queryClient = useQueryClient()
   const v3AirdropContract = useV3AirdropContract()
   const { shouldShowModal, v3WhitelistAddress } = useAirdropModalStatus()
   const [showOnceAirdropModal, setShowOnceAirdropModal] = useShowOnceAirdropModal()
@@ -70,12 +69,18 @@ const V3AirdropModal: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
 
   const data = useMemo(
-    () => (account ? (v3WhitelistAddress?.[account.toLowerCase()] as WhitelistType) : (null as WhitelistType)),
+    () => (account ? (v3WhitelistAddress?.[account.toLowerCase()] as WhitelistType) : undefined),
     [account, v3WhitelistAddress],
   )
 
-  const { data: v3ForSC } = useSWRImmutable(data && '/airdrop-SC-json')
-  const { data: v3MerkleProofs } = useSWRImmutable(data && '/airdrop-Merkle-json')
+  const { data: v3ForSC } = useQuery({
+    queryKey: ['/airdrop-SC-json'],
+    enabled: Boolean(data),
+  })
+  const { data: v3MerkleProofs } = useQuery({
+    queryKey: ['/airdrop-Merkle-json'],
+    enabled: Boolean(data),
+  })
 
   useEffect(() => {
     if (shouldShowModal && showOnceAirdropModal) {
@@ -99,25 +104,39 @@ const V3AirdropModal: React.FC = () => {
       let v3ForSCResponse = v3ForSC
       if (!v3ForSCResponse) {
         v3ForSCResponse = await (await fetch(`${GITHUB_ENDPOINT}/forSC.json`)).json()
-        mutate('/airdrop-SC-json', v3ForSCResponse, { revalidate: false })
+        queryClient
+          .getQueryCache()
+          .find({
+            queryKey: ['/airdrop-SC-json'],
+          })
+          ?.setData(v3ForSCResponse)
       }
-      const { cakeAmountInWei, nft1, nft2 } = v3ForSCResponse?.[account?.toLowerCase()] || {}
-      let v3MerkleProofsResponse = v3MerkleProofs
+      const { cakeAmountInWei, nft1, nft2 } = (account && v3ForSCResponse?.[account?.toLowerCase()]) || {}
+      let v3MerkleProofsResponse = v3MerkleProofs as { merkleProofs: { [account: string]: any } }
       if (!v3MerkleProofsResponse) {
         v3MerkleProofsResponse = await (await fetch(`${GITHUB_ENDPOINT}/v3MerkleProofs.json`)).json()
-        mutate('/airdrop-Merkle-json', v3MerkleProofsResponse, { revalidate: false })
-        const proof = v3MerkleProofsResponse?.merkleProofs?.[account?.toLowerCase()] || {}
-        const receipt = await fetchWithCatchTxError(() =>
-          v3AirdropContract.write.claim([cakeAmountInWei, nft1, nft2, proof], {
-            account: v3AirdropContract.account,
-            chain: v3AirdropContract.chain,
-          }),
-        )
+        queryClient
+          .getQueryCache()
+          .find({
+            queryKey: ['/airdrop-Merkle-json'],
+          })
+          ?.setData(v3MerkleProofsResponse)
+        const proof = account ? v3MerkleProofsResponse?.merkleProofs?.[account?.toLowerCase()] || {} : {}
+        const receipt = v3AirdropContract.account
+          ? await fetchWithCatchTxError(() =>
+              v3AirdropContract.write.claim([cakeAmountInWei, nft1, nft2, proof], {
+                account: v3AirdropContract.account!,
+                chain: v3AirdropContract.chain,
+              }),
+            )
+          : undefined
         if (receipt?.status) {
           if (showOnceAirdropModal) {
             setShowOnceAirdropModal(!showOnceAirdropModal)
           }
-          mutate([account, '/airdrop-claimed'])
+          queryClient.invalidateQueries({
+            queryKey: [account, '/airdrop-claimed'],
+          })
           toastSuccess(t('Success!'), <ToastDescriptionWithTx txHash={receipt.transactionHash} />)
         }
       }
@@ -150,7 +169,7 @@ const V3AirdropModal: React.FC = () => {
   }
 
   return (
-    <ModalV2 isOpen={show} onDismiss={() => handleCloseModal()} closeOnOverlayClick>
+    <ModalV2 isOpen={show} onDismiss={handleCloseModal} closeOnOverlayClick>
       <Modal title={t('Congratulations!')}>
         <Flex
           flexDirection="column"

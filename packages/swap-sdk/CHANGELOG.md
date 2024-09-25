@@ -1,5 +1,129 @@
 # @pancakeswap/sdk
 
+## 5.8.8
+
+### Patch Changes
+
+- Updated dependencies [f551e5e]
+  - @pancakeswap/swap-sdk-core@1.2.0
+  - @pancakeswap/swap-sdk-evm@1.0.5
+  - @pancakeswap/v2-sdk@1.0.5
+
+## 5.8.7
+
+### Patch Changes
+
+- Updated dependencies [9a16780]
+  - @pancakeswap/chains@0.4.6
+  - @pancakeswap/swap-sdk-evm@1.0.4
+  - @pancakeswap/v2-sdk@1.0.4
+
+## 5.8.6
+
+### Patch Changes
+
+- Updated dependencies [b9c91d1]
+  - @pancakeswap/chains@0.4.5
+  - @pancakeswap/swap-sdk-evm@1.0.3
+  - @pancakeswap/v2-sdk@1.0.3
+
+## 5.8.5
+
+### Patch Changes
+
+- edc3f30: Upgrade viem and wagmi
+- Updated dependencies [edc3f30]
+  - @pancakeswap/swap-sdk-evm@1.0.2
+  - @pancakeswap/v2-sdk@1.0.2
+
+## 5.8.4
+
+### Patch Changes
+
+- Updated dependencies [edf4640]
+  - @pancakeswap/chains@0.4.4
+  - @pancakeswap/swap-sdk-evm@1.0.1
+  - @pancakeswap/v2-sdk@1.0.1
+
+## 5.8.3
+
+### Patch Changes
+
+- e99c216: Introduce v2-sdk and swap-sdk-evm
+- Updated dependencies [e99c216]
+  - @pancakeswap/swap-sdk-evm@1.0.0
+  - @pancakeswap/v2-sdk@1.0.0
+
+## 5.8.2
+
+### Patch Changes
+
+- Updated dependencies [0f4281c]
+- Updated dependencies [63a63d8]
+  - @pancakeswap/chains@0.4.3
+
+## 5.8.1
+
+### Patch Changes
+
+- 72c834c: Upgrade viem and wagmi v2
+- Updated dependencies [72c834c]
+- Updated dependencies [d4283e5]
+  - @pancakeswap/chains@0.4.2
+
+## 5.8.0
+
+### Minor Changes
+
+- 610a24a: Introduce v4 router with faster quoting speed
+
+### Patch Changes
+
+- Updated dependencies [610a24a]
+  - @pancakeswap/swap-sdk-core@1.1.0
+
+## 5.7.7
+
+### Patch Changes
+
+- Updated dependencies [c269d43]
+  - @pancakeswap/swap-sdk-core@1.0.1
+
+## 5.7.6
+
+### Patch Changes
+
+- 91969f80f: Add sepolia, base sepolia, arbitrum sepolia support
+- Updated dependencies [91969f80f]
+  - @pancakeswap/chains@0.4.1
+
+## 5.7.5
+
+### Patch Changes
+
+- Updated dependencies [8fcd67c85]
+  - @pancakeswap/chains@0.4.0
+
+## 5.7.4
+
+### Patch Changes
+
+- Updated dependencies [49730e609]
+  - @pancakeswap/chains@0.3.1
+
+## 5.7.3
+
+### Patch Changes
+
+- 2ec03f1b2: chore: Bump up gauges
+
+## 5.7.2
+
+### Patch Changes
+
+- Updated dependencies [c236a3ee4]
+  - @pancakeswap/chains@0.3.0
+
 ## 5.7.1
 
 ### Patch Changes

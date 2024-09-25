@@ -1,12 +1,11 @@
-import memoize from 'lodash/memoize'
 import { ContextApi } from '@pancakeswap/localization'
-import { PageMeta } from './types'
+import memoize from 'lodash/memoize'
 import { ASSET_CDN } from './endpoints'
+import { PageMeta } from './types'
 
 export const DEFAULT_META: PageMeta = {
   title: 'PancakeSwap',
-  description:
-    'The most popular AMM on BSC by user count! Earn CAKE through yield farming or win it in the Lottery, then stake it in Syrup Pools to earn more tokens! Initial Farm Offerings (new token launch model pioneered by PancakeSwap), NFTs, and more, on a platform you can trust.',
+  description: 'Trade, earn, and own crypto on the all-in-one multichain DEX',
   image: `${ASSET_CDN}/web/og/hero.jpg`,
 }
 
@@ -28,7 +27,8 @@ const getPathList = (t: ContextApi['t']): PathList => {
       '/competition': { title: t('Trading Battle') },
       '/prediction': { title: t('Prediction'), image: `${ASSET_CDN}/web/og/prediction.jpg` },
       '/prediction/leaderboard': { title: t('Leaderboard'), image: `${ASSET_CDN}/web/og/liquidity.jpg` },
-      '/farms': { title: t('Farms'), image: `${ASSET_CDN}/web/og/farms.jpg` },
+      '/liquidity/pools': { title: t('Earn from LP'), image: `${ASSET_CDN}/web/og/farms.jpg` },
+      '/liquidity/positions': { title: t('My Positions'), image: `${ASSET_CDN}/web/og/farms.jpg` },
       '/farms/auction': { title: t('Farm Auctions'), image: `${ASSET_CDN}/web/og/liquidity.jpg` },
       '/pools': { title: t('Pools'), image: `${ASSET_CDN}/web/og/pools.jpg` },
       '/lottery': { title: t('Lottery'), image: `${ASSET_CDN}/web/og/lottery.jpg` },
@@ -45,6 +45,12 @@ const getPathList = (t: ContextApi['t']): PathList => {
       '/info/pairs': {
         title: `${t('Pairs')} - ${t('Info')}`,
         description: 'View statistics for Pancakeswap exchanges.',
+        image: `${ASSET_CDN}/web/og/info.jpg`,
+      },
+      '/liquidity/pool': {
+        basePath: true,
+        title: `${t('Pool Detail')}`,
+        description: 'View statistics for Pancakeswap pool.',
         image: `${ASSET_CDN}/web/og/info.jpg`,
       },
       '/info/tokens': {
@@ -64,11 +70,10 @@ const getPathList = (t: ContextApi['t']): PathList => {
 }
 
 export const getCustomMeta = memoize(
-  (path: string, t: ContextApi['t'], _: string): PageMeta => {
+  (path: string, t: ContextApi['t'], _: string): PageMeta | null => {
     const pathList = getPathList(t)
-    const pathMetadata =
-      pathList.paths[path] ??
-      pathList.paths[Object.entries(pathList.paths).find(([url, data]) => data.basePath && path.startsWith(url))?.[0]]
+    const basePath = Object.entries(pathList.paths).find(([url, data]) => data.basePath && path.startsWith(url))?.[0]
+    const pathMetadata = pathList.paths[path] ?? (basePath && pathList.paths[basePath])
 
     if (pathMetadata) {
       return {

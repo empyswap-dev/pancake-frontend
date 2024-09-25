@@ -1,21 +1,11 @@
-import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from 'next'
+import { GetStaticPaths, GetStaticProps } from 'next'
 // eslint-disable-next-line camelcase
-import { SWRConfig, unstable_serialize } from 'swr'
 import { getCollection } from 'state/nftMarket/helpers'
 import CollectionPageRouter from 'views/Nft/market/Collection/CollectionPageRouter'
-import SubMenu from 'views/Nft/market/components/SubMenu'
+import { dehydrate, QueryClient } from '@tanstack/react-query'
 
-const CollectionPage = ({ fallback = {} }: InferGetStaticPropsType<typeof getStaticProps>) => {
-  return (
-    <SWRConfig
-      value={{
-        fallback,
-      }}
-    >
-      <SubMenu />
-      <CollectionPageRouter />
-    </SWRConfig>
-  )
+const CollectionPage = () => {
+  return <CollectionPageRouter />
 }
 
 export const getStaticPaths: GetStaticPaths = async () => {
@@ -26,7 +16,8 @@ export const getStaticPaths: GetStaticPaths = async () => {
 }
 
 export const getStaticProps: GetStaticProps = async ({ params }) => {
-  const { collectionAddress } = params
+  const queryClient = new QueryClient()
+  const collectionAddress = params?.collectionAddress
   if (typeof collectionAddress !== 'string') {
     return {
       notFound: true,
@@ -34,14 +25,15 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
   }
 
   try {
-    const collectionData = await getCollection(collectionAddress)
+    const collectionData = await queryClient.fetchQuery({
+      queryKey: ['nftMarket', 'collections', collectionAddress.toLowerCase()],
+      queryFn: () => getCollection(collectionAddress),
+    })
 
     if (collectionData) {
       return {
         props: {
-          fallback: {
-            [unstable_serialize(['nftMarket', 'collections', collectionAddress.toLowerCase()])]: { ...collectionData },
-          },
+          dehydratedState: dehydrate(queryClient),
         },
         revalidate: 60 * 60 * 6, // 6 hours
       }

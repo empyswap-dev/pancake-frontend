@@ -1,36 +1,24 @@
-import {
-  Box,
-  CardBody,
-  CardProps,
-  Button,
-  Flex,
-  Text,
-  TokenPairImage,
-  FlexGap,
-  Skeleton,
-  useModal,
-} from '@pancakeswap/uikit'
+import { Box, Button, CardBody, CardProps, Flex, FlexGap, Skeleton, TokenPairImage, useModal } from '@pancakeswap/uikit'
 import { Pool } from '@pancakeswap/widgets-internal'
 
-import { useAccount } from 'wagmi'
-import ConnectWalletButton from 'components/ConnectWalletButton'
-import { vaultPoolConfig } from 'config/constants/pools'
 import { useTranslation } from '@pancakeswap/localization'
-import { useVaultPoolByKey } from 'state/pools/hooks'
-import { VaultKey, DeserializedLockedCakeVault, DeserializedCakeVault } from 'state/types'
-import { styled } from 'styled-components'
 import { Token } from '@pancakeswap/sdk'
+import { vaultPoolConfig } from 'config/constants/pools'
+import { useVaultPoolByKey } from 'state/pools/hooks'
+import { DeserializedCakeVault, DeserializedLockedCakeVault, VaultKey } from 'state/types'
+import { styled } from 'styled-components'
+import { VaultPosition, getVaultPosition } from 'utils/cakePool'
 import BenefitsModal from 'views/Pools/components/RevenueSharing/BenefitsModal'
-import { getVaultPosition, VaultPosition } from 'utils/cakePool'
 import useVCake from 'views/Pools/hooks/useVCake'
+import { useAccount } from 'wagmi'
 
+import { VeCakeCard, VeCakeUpdateCard } from 'views/CakeStaking/components/SyrupPool'
+import { useIsUserDelegated } from 'views/CakeStaking/hooks/useIsUserDelegated'
+import LockedStakingApy from '../LockedPool/LockedStakingApy'
 import CardFooter from '../PoolCard/CardFooter'
 import { VaultPositionTagWithLabel } from '../Vault/VaultPositionTag'
 import UnstakingFeeCountdownRow from './UnstakingFeeCountdownRow'
-import RecentCakeProfitRow from './RecentCakeProfitRow'
-import { StakingApy } from './StakingApy'
 import VaultCardActions from './VaultCardActions'
-import LockedStakingApy from '../LockedPool/LockedStakingApy'
 
 const StyledCardBody = styled(CardBody)<{ isLoading: boolean }>`
   min-height: ${({ isLoading }) => (isLoading ? '0' : '254px')};
@@ -46,13 +34,13 @@ interface CakeVaultProps extends CardProps {
 
 interface CakeVaultDetailProps {
   isLoading?: boolean
-  account: string
+  account?: string
   pool: Pool.DeserializedPool<Token>
   vaultPool: DeserializedCakeVault
-  accountHasSharesStaked: boolean
+  accountHasSharesStaked?: boolean
   defaultFooterExpanded?: boolean
   showICake?: boolean
-  performanceFeeAsDecimal: number
+  performanceFeeAsDecimal?: number
 }
 
 export const CakeVaultDetail: React.FC<React.PropsWithChildren<CakeVaultDetailProps>> = ({
@@ -76,6 +64,7 @@ export const CakeVaultDetail: React.FC<React.PropsWithChildren<CakeVaultDetailPr
 
   const vaultPosition = getVaultPosition(vaultPool.userData)
   const isLocked = (vaultPool as DeserializedLockedCakeVault)?.userData?.locked
+  const isUserDelegated = useIsUserDelegated()
 
   if (!pool) {
     return null
@@ -84,6 +73,8 @@ export const CakeVaultDetail: React.FC<React.PropsWithChildren<CakeVaultDetailPr
   return (
     <>
       <StyledCardBody isLoading={isLoading}>
+        {vaultPosition >= VaultPosition.LockedEnd && !isUserDelegated && <VeCakeUpdateCard isLockEndOrAfterLock />}
+
         {account && pool.vaultKey === VaultKey.CakeVault && (
           <VaultPositionTagWithLabel userData={(vaultPool as DeserializedLockedCakeVault)?.userData} />
         )}
@@ -103,38 +94,40 @@ export const CakeVaultDetail: React.FC<React.PropsWithChildren<CakeVaultDetailPr
           </>
         ) : (
           <>
-            <StakingApy pool={pool} />
-            <FlexGap mt="16px" gap="24px" flexDirection={accountHasSharesStaked ? 'column-reverse' : 'column'}>
-              <Box>
-                {account && (
-                  <Box mb="8px">
-                    <UnstakingFeeCountdownRow vaultKey={pool.vaultKey} />
-                  </Box>
-                )}
-                <RecentCakeProfitRow pool={pool} />
-              </Box>
-              <Flex flexDirection="column">
-                {account ? (
-                  <VaultCardActions
-                    pool={pool}
-                    accountHasSharesStaked={accountHasSharesStaked}
-                    isLoading={isLoading}
-                    performanceFee={performanceFeeAsDecimal}
-                  />
-                ) : (
-                  <>
-                    <Text mb="10px" textTransform="uppercase" fontSize="12px" color="textSubtle" bold>
-                      {t('Start earning')}
-                    </Text>
-                    <ConnectWalletButton />
-                  </>
-                )}
-              </Flex>
-            </FlexGap>
+            {account && vaultPosition === VaultPosition.Flexible && !isUserDelegated ? (
+              <VeCakeUpdateCard isFlexibleStake />
+            ) : (
+              <VeCakeCard />
+            )}
+            {/* {<StakingApy pool={pool} />} */}
+            {vaultPosition !== VaultPosition.None && !isUserDelegated && (
+              <FlexGap mt="16px" gap="24px" flexDirection={accountHasSharesStaked ? 'column-reverse' : 'column'}>
+                <Box>
+                  {account && (
+                    <Box mb="8px">
+                      <UnstakingFeeCountdownRow vaultKey={pool.vaultKey ?? VaultKey.CakeVaultV1} />
+                    </Box>
+                  )}
+                  {/* <RecentCakeProfitRow pool={pool} /> */}
+                </Box>
+                <Flex flexDirection="column">
+                  {account && (
+                    <VaultCardActions
+                      pool={pool}
+                      accountHasSharesStaked={accountHasSharesStaked}
+                      isLoading={isLoading}
+                      performanceFee={performanceFeeAsDecimal}
+                    />
+                  )}
+                </Flex>
+              </FlexGap>
+            )}
           </>
         )}
       </StyledCardBody>
-      <CardFooter isLocked={isLocked} defaultExpanded={defaultFooterExpanded} pool={pool} account={account} />
+      {account && !isUserDelegated && (
+        <CardFooter isLocked={isLocked} defaultExpanded={defaultFooterExpanded} pool={pool} account={account} />
+      )}
     </>
   )
 }
@@ -152,10 +145,9 @@ const CakeVaultCard: React.FC<React.PropsWithChildren<CakeVaultProps>> = ({
   const vaultPool = useVaultPoolByKey(pool?.vaultKey || VaultKey.CakeVault)
   const totalStaked = pool?.totalStaked
 
-  const {
-    userData: { userShares, isLoading: isVaultUserDataLoading },
-    fees: { performanceFeeAsDecimal },
-  } = vaultPool
+  const userShares = vaultPool?.userData?.userShares
+  const isVaultUserDataLoading = vaultPool?.userData?.isLoading
+  const performanceFeeAsDecimal = vaultPool?.fees?.performanceFeeAsDecimal
 
   const accountHasSharesStaked = userShares && userShares.gt(0)
   const isLoading = !pool?.userData || isVaultUserDataLoading
@@ -170,10 +162,10 @@ const CakeVaultCard: React.FC<React.PropsWithChildren<CakeVaultProps>> = ({
         {!showSkeleton || (totalStaked && totalStaked.gte(0)) ? (
           <>
             <Pool.PoolCardHeaderTitle
-              title={vaultPoolConfig[pool.vaultKey].name}
-              subTitle={vaultPoolConfig[pool.vaultKey].description}
+              title={vaultPoolConfig?.[pool.vaultKey ?? '']?.name ?? ''}
+              subTitle={vaultPoolConfig?.[pool.vaultKey ?? ''].description ?? ''}
             />
-            <TokenPairImage {...vaultPoolConfig[pool.vaultKey].tokenImage} width={64} height={64} />
+            <TokenPairImage {...vaultPoolConfig?.[pool.vaultKey ?? ''].tokenImage} width={64} height={64} />
           </>
         ) : (
           <Flex width="100%" justifyContent="space-between">

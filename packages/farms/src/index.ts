@@ -1,28 +1,41 @@
-import { PublicClient, formatEther } from 'viem'
 import { ChainId } from '@pancakeswap/chains'
 import BigNumber from 'bignumber.js'
+import { PublicClient, formatEther } from 'viem'
 import {
+  FarmSupportedChainId,
+  FarmV2SupportedChainId,
   FarmV3SupportedChainId,
+  FarmV4SupportedChainId,
+  bCakeSupportedChainId,
   masterChefAddresses,
   masterChefV3Addresses,
+  supportedChainId,
   supportedChainIdV2,
   supportedChainIdV3,
-  bCakeSupportedChainId,
-  FarmV2SupportedChainId,
+  supportedChainIdV4,
 } from './const'
-import { farmV2FetchFarms, FetchFarmsParams, fetchMasterChefV2Data } from './v2/fetchFarmsV2'
 import {
-  farmV3FetchFarms,
-  fetchMasterChefV3Data,
-  fetchCommonTokenUSDValue,
-  fetchTokenUSDValues,
   CommonPrice,
   LPTvl,
+  farmV3FetchFarms,
+  fetchCommonTokenUSDValue,
+  fetchMasterChefV3Data,
+  fetchTokenUSDValues,
   getCakeApr,
 } from './fetchFarmsV3'
 import { ComputedFarmConfigV3, FarmV3DataWithPrice } from './types'
+import { FetchFarmsParams, farmV2FetchFarms, fetchMasterChefV2Data } from './v2/fetchFarmsV2'
 
-export { type FarmV3SupportedChainId, supportedChainIdV3, bCakeSupportedChainId, supportedChainIdV2 }
+export {
+  bCakeSupportedChainId,
+  supportedChainId,
+  supportedChainIdV2,
+  supportedChainIdV3,
+  supportedChainIdV4,
+  type FarmSupportedChainId,
+  type FarmV3SupportedChainId,
+  type FarmV4SupportedChainId,
+}
 
 export function createFarmFetcher(provider: ({ chainId }: { chainId: FarmV2SupportedChainId }) => PublicClient) {
   const fetchFarms = async (
@@ -75,7 +88,7 @@ export function createFarmFetcherV3(provider: ({ chainId }: { chainId: number })
     commonPrice: CommonPrice
   }) => {
     const masterChefAddress = masterChefV3Addresses[chainId]
-    if (!masterChefAddress) {
+    if (!masterChefAddress || !provider) {
       throw new Error('Unsupported chain')
     }
 
@@ -110,13 +123,19 @@ export function createFarmFetcherV3(provider: ({ chainId }: { chainId: number })
     }
   }
 
-  const getCakeAprAndTVL = (farm: FarmV3DataWithPrice, lpTVL: LPTvl, cakePrice: string, cakePerSecond: string) => {
+  const getCakeAprAndTVL = (
+    farm: FarmV3DataWithPrice,
+    lpTVL: LPTvl,
+    cakePrice: string,
+    cakePerSecond: string,
+    boosterLiquidityX?: number,
+  ) => {
     const [token0Price, token1Price] = farm.token.sortsBefore(farm.quoteToken)
       ? [farm.tokenPriceBusd, farm.quoteTokenPriceBusd]
       : [farm.quoteTokenPriceBusd, farm.tokenPriceBusd]
     const tvl = new BigNumber(token0Price).times(lpTVL.token0).plus(new BigNumber(token1Price).times(lpTVL.token1))
 
-    const cakeApr = getCakeApr(farm.poolWeight, tvl, cakePrice, cakePerSecond)
+    const cakeApr = getCakeApr(farm.poolWeight, tvl.times(boosterLiquidityX ?? 1), cakePrice, cakePerSecond)
 
     return {
       activeTvlUSD: tvl.toString(),
@@ -135,13 +154,15 @@ export function createFarmFetcherV3(provider: ({ chainId }: { chainId: number })
 }
 
 export * from './apr'
-export * from './utils'
-export * from './v2/farmsPriceHelpers'
-export * from './types'
-export type { FarmWithPrices } from './v2/farmPrices'
-export * from './v2/deserializeFarmUserData'
-export * from './v2/deserializeFarm'
 export { FARM_AUCTION_HOSTING_IN_SECONDS } from './const'
+export * from './farms'
+export * from './getLegacyFarmConfig'
+export * from './types'
+export * from './utils'
+export * from './v2/deserializeFarm'
+export * from './v2/deserializeFarmUserData'
+export type { FarmWithPrices } from './v2/farmPrices'
+export * from './v2/farmsPriceHelpers'
 export * from './v2/filterFarmsByQuery'
 
-export { masterChefV3Addresses, fetchCommonTokenUSDValue, fetchTokenUSDValues }
+export { fetchCommonTokenUSDValue, fetchTokenUSDValues, masterChefV3Addresses }

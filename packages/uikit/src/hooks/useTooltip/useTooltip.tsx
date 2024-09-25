@@ -1,10 +1,10 @@
-import { AnimatePresence, Variants, LazyMotion, domAnimation } from "framer-motion";
+import { AnimatePresence, LazyMotion, Variants, domAnimation } from "framer-motion";
+import debounce from "lodash/debounce";
 import React, { useCallback, useEffect, useState } from "react";
+import { isMobile } from "react-device-detect";
 import { createPortal } from "react-dom";
 import { usePopper } from "react-popper";
-import { isMobile } from "react-device-detect";
 import { useTheme } from "styled-components";
-import debounce from "lodash/debounce";
 import getPortalRoot from "../../util/getPortalRoot";
 import isTouchDevice from "../../util/isTouchDevice";
 import { Arrow, StyledTooltip } from "./StyledTooltip";
@@ -87,12 +87,12 @@ const useTooltip = (content: React.ReactNode, options?: TooltipOptions): Tooltip
     (e: Event) => {
       setVisible(true);
       if (trigger === "hover") {
-        // we dont need to make a inTooltipRef anymore, when we leave
+        // we don't need to make a inTooltipRef anymore, when we leave
         // the target, hide tooltip is called for leaving the target, but show tooltip
         // is called for entering the tooltip. since we enact a delay in hidetooltip,
-        // by the time the dylay is over lodash debounce will be cancelled until we leave the
-        // tooltip calling hidetooltip onece again to close. clever method jackson pointed me
-        // onto. saves a lot of nedless states and refs and listeners
+        // by the time the delay is over lodash debounce will be cancelled until we leave the
+        // tooltip calling hidetooltip once again to close. clever method jackson pointed me
+        // onto. saves a lot of needless states and refs and listeners
         debouncedHide.cancel();
       }
       if (!avoidToStopPropagation) {
@@ -202,30 +202,28 @@ const useTooltip = (content: React.ReactNode, options?: TooltipOptions): Tooltip
     e.stopPropagation();
   }, []);
 
-  const tooltip = (
-    <StyledTooltip
-      onClick={stopPropagation}
-      data-theme={isDark ? "light" : "dark"}
-      {...animationMap}
-      variants={animationVariants}
-      transition={{ duration: 0.3 }}
-      ref={setTooltipElement}
-      style={styles.popper}
-      {...attributes.popper}
-    >
-      {content}
-      <Arrow ref={setArrowElement} style={styles.arrow} />
-    </StyledTooltip>
-  );
-
-  const AnimatedTooltip = (
+  const AnimatedTooltip = visible ? (
     <LazyMotion features={domAnimation}>
-      <AnimatePresence>{visible && tooltip}</AnimatePresence>
+      <AnimatePresence>
+        <StyledTooltip
+          onClick={stopPropagation}
+          data-theme={isDark ? "light" : "dark"}
+          {...animationMap}
+          variants={animationVariants}
+          transition={{ duration: 0.3 }}
+          ref={setTooltipElement}
+          style={styles.popper}
+          {...attributes.popper}
+        >
+          {content}
+          <Arrow ref={setArrowElement} style={styles.arrow} />
+        </StyledTooltip>
+      </AnimatePresence>
     </LazyMotion>
-  );
+  ) : null;
 
-  const portal = getPortalRoot();
-  const tooltipInPortal = portal && isInPortal ? createPortal(AnimatedTooltip, portal) : null;
+  const portal = visible && isInPortal && getPortalRoot();
+  const tooltipInPortal = visible && isInPortal && portal ? createPortal(AnimatedTooltip, portal) : null;
 
   return {
     targetRef: setTargetElement,

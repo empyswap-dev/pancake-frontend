@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react'
-import { Text, Box, Card, Flex, Skeleton } from '@pancakeswap/uikit'
-import LineChart from 'views/Info/components/InfoCharts/LineChart'
-import BarChart from 'views/Info/components/InfoCharts/BarChart'
-import { TabToggleGroup, TabToggle } from 'components/TabToggle'
 import { useTranslation } from '@pancakeswap/localization'
-import { formatAmount } from 'utils/formatInfoNumbers'
-import { ChartEntry, TokenData, PriceChartEntry } from 'state/info/types'
-import dynamic from 'next/dynamic'
+import { Box, Card, Flex, Skeleton, Text } from '@pancakeswap/uikit'
+import { TabToggle, TabToggleGroup } from 'components/TabToggle'
 import dayjs from 'dayjs'
+import dynamic from 'next/dynamic'
+import { useMemo, useState } from 'react'
+import { PriceChartEntry, TokenData, TvlChartEntry, VolumeChartEntry } from 'state/info/types'
+import { formatAmount } from 'utils/formatInfoNumbers'
+import BarChart from 'views/Info/components/InfoCharts/BarChart'
+import LineChart from 'views/Info/components/InfoCharts/LineChart'
 
 const CandleChart = dynamic(() => import('../CandleChart'), {
   ssr: false,
@@ -21,14 +21,16 @@ enum ChartView {
 
 interface ChartCardProps {
   variant: 'pool' | 'token'
-  chartData: ChartEntry[]
+  volumeChartData: VolumeChartEntry[] | undefined
+  tvlChartData: TvlChartEntry[] | undefined
   tokenData?: TokenData
   tokenPriceData?: PriceChartEntry[]
 }
 
 const ChartCard: React.FC<React.PropsWithChildren<ChartCardProps>> = ({
   variant,
-  chartData,
+  volumeChartData,
+  tvlChartData,
   tokenData,
   tokenPriceData,
 }) => {
@@ -43,8 +45,8 @@ const ChartCard: React.FC<React.PropsWithChildren<ChartCardProps>> = ({
   const currentDate = new Date().toLocaleString(locale, { month: 'short', year: 'numeric', day: 'numeric' })
 
   const formattedTvlData = useMemo(() => {
-    if (chartData) {
-      return chartData.map((day) => {
+    if (tvlChartData) {
+      return tvlChartData.map((day) => {
         return {
           time: dayjs.unix(day.date).toDate(),
           value: day.liquidityUSD,
@@ -52,10 +54,10 @@ const ChartCard: React.FC<React.PropsWithChildren<ChartCardProps>> = ({
       })
     }
     return []
-  }, [chartData])
+  }, [tvlChartData])
   const formattedVolumeData = useMemo(() => {
-    if (chartData) {
-      return chartData.map((day) => {
+    if (volumeChartData) {
+      return volumeChartData.map((day) => {
         return {
           time: dayjs.unix(day.date).toDate(),
           value: day.volumeUSD,
@@ -63,10 +65,10 @@ const ChartCard: React.FC<React.PropsWithChildren<ChartCardProps>> = ({
       })
     }
     return []
-  }, [chartData])
+  }, [volumeChartData])
 
   const getLatestValueDisplay = () => {
-    let valueToDisplay = null
+    let valueToDisplay: string | undefined = ''
     if (hoverValue) {
       valueToDisplay = formatAmount(hoverValue)
     } else if (view === ChartView.VOLUME && formattedVolumeData.length > 0) {
@@ -95,10 +97,12 @@ const ChartCard: React.FC<React.PropsWithChildren<ChartCardProps>> = ({
         <TabToggle isActive={view === ChartView.LIQUIDITY} onClick={() => setView(ChartView.LIQUIDITY)}>
           <Text>{t('Liquidity')}</Text>
         </TabToggle>
-        {variant === 'token' && (
+        {variant === 'token' ? (
           <TabToggle isActive={view === ChartView.PRICE} onClick={() => setView(ChartView.PRICE)}>
             <Text>{t('Price')}</Text>
           </TabToggle>
+        ) : (
+          <></>
         )}
       </TabToggleGroup>
 

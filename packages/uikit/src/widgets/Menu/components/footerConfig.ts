@@ -7,27 +7,23 @@ export const footerLinks: (t: ContextApi["t"]) => FooterLinkType[] = (t) => [
     items: [
       {
         label: t("Trade"),
-        href: "/swap",
+        href: "https://pancakeswap.finance/swap",
       },
       {
         label: t("Earn"),
-        href: "/farms",
+        href: "https://pancakeswap.finance/liquidity/pools",
       },
       {
         label: t("Game"),
-        href: "/prediction",
+        href: "https://pancakeswap.games/",
       },
       {
         label: t("NFT"),
-        href: "/nfts",
+        href: "https://pancakeswap.finance/nfts",
       },
       {
         label: t("Tokenomics"),
         href: "https://docs.pancakeswap.finance/governance-and-tokenomics/cake-tokenomics",
-      },
-      {
-        label: t("Litepaper"),
-        href: "https://assets.pancakeswap.finance/litepaper/v2litepaper.pdf",
       },
       {
         label: t("CAKE Emission Projection"),
@@ -70,6 +66,10 @@ export const footerLinks: (t: ContextApi["t"]) => FooterLinkType[] = (t) => [
       {
         label: t("Bug Bounty"),
         href: "https://docs.pancakeswap.finance/developers/bug-bounty",
+      },
+      {
+        label: t("v4"),
+        href: "https://pancakeswap.finance/v4",
       },
     ],
   },

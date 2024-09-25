@@ -1,6 +1,6 @@
 import { ReactNode, useCallback } from 'react'
 import { styled } from 'styled-components'
-import { StaticImageData } from 'next/dist/client/image'
+import { StaticImageData } from 'next/dist/client/legacy/image'
 import {
   Card,
   CardBody,
@@ -17,6 +17,7 @@ import { CLAIM, OVER } from 'config/constants/trading-competition/phases'
 import ConnectWalletButton from 'components/ConnectWalletButton'
 import SubgraphHealthIndicator from 'components/SubgraphHealthIndicator'
 import { useTranslation } from '@pancakeswap/localization'
+import { ChainId } from '@pancakeswap/chains'
 import ClaimModal from '../ClaimModal'
 import CardUserInfo from './CardUserInfo'
 import ShareImageModal from '../ShareImageModal'
@@ -56,7 +57,7 @@ interface ScoreCardProps extends YourScoreProps {
   stormShareImage: StaticImageData
   cakersShareImage: StaticImageData
   extraUserRankBox?: ReactNode
-  subgraphName?: string
+  subgraph?: string
 }
 
 const ScoreCard: React.FC<React.PropsWithChildren<ScoreCardProps>> = ({
@@ -76,7 +77,7 @@ const ScoreCard: React.FC<React.PropsWithChildren<ScoreCardProps>> = ({
   finishedAndPrizesClaimed,
   finishedAndNothingToClaim,
   onClaimSuccess,
-  subgraphName,
+  subgraph,
 }) => {
   const { t } = useTranslation()
   const [onPresentClaimModal] = useModal(
@@ -86,7 +87,7 @@ const ScoreCard: React.FC<React.PropsWithChildren<ScoreCardProps>> = ({
   const handleOnClick = useCallback(() => onPresentClaimModal?.(), [onPresentClaimModal])
 
   const isClaimButtonDisabled = Boolean(isLoading || finishedAndPrizesClaimed || finishedAndNothingToClaim)
-  const { hasUserClaimed } = userTradingInformation
+  const { hasUserClaimed } = userTradingInformation as any
 
   const getClaimButtonText = () => {
     if (userCanClaimPrizes) {
@@ -130,7 +131,7 @@ const ScoreCard: React.FC<React.PropsWithChildren<ScoreCardProps>> = ({
               userLeaderboardInformation={userLeaderboardInformation}
               currentPhase={currentPhase}
             />
-            {hasRegistered && (currentPhase.state === CLAIM || currentPhase.state === OVER) && userPrizeGrid}
+            {hasRegistered && (currentPhase?.state === CLAIM || currentPhase?.state === OVER) && userPrizeGrid}
             {!account && (
               <Flex mt="24px" justifyContent="center">
                 <ConnectWalletButton />
@@ -139,7 +140,7 @@ const ScoreCard: React.FC<React.PropsWithChildren<ScoreCardProps>> = ({
           </>
         )}
       </CardBody>
-      {hasRegistered && currentPhase.state === CLAIM && (
+      {hasRegistered && currentPhase?.state === CLAIM && (
         <StyledCardFooter>
           <LaurelLeftIcon />
           <StyledButton disabled={isClaimButtonDisabled} mx="18px" onClick={handleOnClick}>
@@ -148,10 +149,11 @@ const ScoreCard: React.FC<React.PropsWithChildren<ScoreCardProps>> = ({
           <LaurelRightIcon />
         </StyledCardFooter>
       )}
-      {subgraphName && hasRegistered && (
+      {subgraph && hasRegistered && (
         <Flex p="16px" justifyContent="flex-end">
           <SubgraphHealthIndicator
-            subgraphName={subgraphName}
+            chainId={ChainId.BSC}
+            subgraph={subgraph}
             inline
             obeyGlobalSetting={false}
             customDescriptions={{

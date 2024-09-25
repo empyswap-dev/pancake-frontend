@@ -1,12 +1,13 @@
 import { createClient } from '@pancakeswap/awgmi'
-import { PetraConnector } from '@pancakeswap/awgmi/connectors/petra'
-import { MartianConnector } from '@pancakeswap/awgmi/connectors/martian'
 import { BloctoConnector } from '@pancakeswap/awgmi/connectors/blocto'
-import { PontemConnector } from '@pancakeswap/awgmi/connectors/pontem'
 import { FewchaConnector } from '@pancakeswap/awgmi/connectors/fewcha'
-import { SafePalConnector } from '@pancakeswap/awgmi/connectors/safePal'
+import { MartianConnector } from '@pancakeswap/awgmi/connectors/martian'
+import { MsafeConnector } from '@pancakeswap/awgmi/connectors/msafe'
+import { PetraConnector } from '@pancakeswap/awgmi/connectors/petra'
+import { PontemConnector } from '@pancakeswap/awgmi/connectors/pontem'
 import { RiseConnector } from '@pancakeswap/awgmi/connectors/rise'
-import { AptosClient } from 'aptos'
+import { SafePalConnector } from '@pancakeswap/awgmi/connectors/safePal'
+import { Aptos, AptosConfig, NetworkToNetworkName } from '@aptos-labs/ts-sdk'
 import { chains, defaultChain } from 'config/chains'
 
 const NODE_REAL_API = process.env.NEXT_PUBLIC_NODE_REAL_API
@@ -21,6 +22,8 @@ const nodeReal = {
   }),
 }
 
+export const msafeConnector = new MsafeConnector({ chains })
+
 export const client = createClient({
   connectors: [
     new PetraConnector({ chains }),
@@ -31,6 +34,7 @@ export const client = createClient({
     new PetraConnector({ chains, options: { name: 'Trust Wallet', id: 'trustWallet' } }),
     new SafePalConnector({ chains }),
     new RiseConnector({ chains }),
+    msafeConnector,
   ],
   provider: ({ networkName }) => {
     const networkNameLowerCase = networkName?.toLowerCase()
@@ -38,15 +42,30 @@ export const client = createClient({
       const foundChain = chains.find((c) => c.network === networkNameLowerCase)
       if (foundChain) {
         if (foundChain.nodeUrls.nodeReal && nodeReal[networkNameLowerCase]) {
-          return new AptosClient(`${foundChain.nodeUrls.nodeReal}/${nodeReal[networkNameLowerCase]}`, {
-            WITH_CREDENTIALS: false,
-          })
+          return new Aptos(
+            new AptosConfig({
+              network: NetworkToNetworkName[networkNameLowerCase],
+              fullnode: `${foundChain.nodeUrls.nodeReal}/${nodeReal[networkNameLowerCase]}/v1`,
+              clientConfig: {
+                WITH_CREDENTIALS: false,
+              },
+            }),
+          )
         }
-        return new AptosClient(foundChain.nodeUrls.default)
+        return new Aptos(
+          new AptosConfig({
+            network: NetworkToNetworkName[networkNameLowerCase],
+          }),
+        )
       }
     }
 
-    return new AptosClient(defaultChain.nodeUrls.default)
+    return new Aptos(
+      new AptosConfig({
+        network: NetworkToNetworkName[defaultChain.network.toLowerCase()],
+        fullnode: defaultChain.nodeUrls.default,
+      }),
+    )
   },
-  autoConnect: true,
+  autoConnect: false,
 })

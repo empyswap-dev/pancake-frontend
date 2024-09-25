@@ -1,12 +1,12 @@
 import React, { PropsWithChildren, useContext, useRef } from "react";
 import { useTheme } from "styled-components";
-import Heading from "../../components/Heading/Heading";
-import getThemeValue from "../../util/getThemeValue";
-import { ModalBody, ModalHeader, ModalTitle, ModalContainer, ModalCloseButton, ModalBackButton } from "./styles";
-import { ModalProps, ModalWrapperProps } from "./types";
-import { useMatchBreakpoints } from "../../contexts";
-import { ModalV2Context } from "./ModalV2";
 import { Box } from "../../components/Box";
+import Heading from "../../components/Heading/Heading";
+import { useMatchBreakpoints } from "../../contexts";
+import getThemeValue from "../../util/getThemeValue";
+import { ModalV2Context } from "./ModalV2";
+import { ModalBackButton, ModalBody, ModalCloseButton, ModalContainer, ModalHeader, ModalTitle } from "./styles";
+import { ModalProps, ModalWrapperProps } from "./types";
 
 export const MODAL_SWIPE_TO_CLOSE_VELOCITY = 300;
 
@@ -14,6 +14,7 @@ export const ModalWrapper = ({
   children,
   onDismiss,
   hideCloseButton,
+  minHeight,
   ...props
 }: PropsWithChildren<ModalWrapperProps>) => {
   const { isMobile } = useMatchBreakpoints();
@@ -35,6 +36,7 @@ export const ModalWrapper = ({
       }}
       ref={wrapperRef}
       style={{ overflow: "visible" }}
+      $minHeight={minHeight}
     >
       <Box overflow="hidden" borderRadius="32px" {...props}>
         {children}
@@ -53,6 +55,7 @@ const Modal: React.FC<React.PropsWithChildren<ModalProps>> = ({
   bodyPadding = "24px",
   headerBackground = "transparent",
   minWidth = "320px",
+  minHeight = "300px",
   headerRightSlot,
   bodyAlignItems,
   headerBorderColor,
@@ -63,7 +66,13 @@ const Modal: React.FC<React.PropsWithChildren<ModalProps>> = ({
   const onDismiss = context?.onDismiss || onDismiss_;
   const theme = useTheme();
   return (
-    <ModalWrapper minWidth={minWidth} onDismiss={onDismiss} hideCloseButton={hideCloseButton} {...props}>
+    <ModalWrapper
+      minWidth={minWidth}
+      minHeight={minHeight}
+      onDismiss={onDismiss}
+      hideCloseButton={hideCloseButton}
+      {...props}
+    >
       <ModalHeader
         background={getThemeValue(theme, `colors.${headerBackground}`, headerBackground)}
         p={headerPadding}

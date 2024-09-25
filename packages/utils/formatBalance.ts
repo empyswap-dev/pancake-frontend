@@ -3,23 +3,24 @@ import { getLanguageCodeFromLS } from '@pancakeswap/localization'
 import _trimEnd from 'lodash/trimEnd'
 import { getFullDecimalMultiplier } from './getFullDecimalMultiplier'
 import { formatUnits } from './viem/formatUnits'
+import { BIG_ZERO } from './bigNumber'
 
 /**
  * Take a formatted amount, e.g. 15 BNB and convert it to full decimal value, e.g. 15000000000000000
  */
 export const getDecimalAmount = (amount: BigNumber, decimals = 18) => {
-  return new BigNumber(amount).times(getFullDecimalMultiplier(decimals))
+  return amount.times(getFullDecimalMultiplier(decimals))
 }
 
 export const getBalanceAmount = (amount: BigNumber, decimals: number | undefined = 18) => {
-  return new BigNumber(amount).dividedBy(getFullDecimalMultiplier(decimals))
+  return amount.dividedBy(getFullDecimalMultiplier(decimals))
 }
 
 /**
  * This function is not really necessary but is used throughout the site.
  */
-export const getBalanceNumber = (balance: BigNumber, decimals = 18) => {
-  return getBalanceAmount(balance, decimals).toNumber()
+export const getBalanceNumber = (balance: BigNumber | undefined, decimals = 18) => {
+  return getBalanceAmount(balance || BIG_ZERO, decimals).toNumber()
 }
 
 export const getFullDisplayBalance = (balance: BigNumber, decimals = 18, displayDecimals?: number): string => {
@@ -79,7 +80,7 @@ export default formatLocalisedCompactNumber
 
 export const formatLpBalance = (balance: BigNumber, decimals: number) => {
   const stakedBalanceBigNumber = getBalanceAmount(balance, decimals)
-  if (stakedBalanceBigNumber.gt(0) && stakedBalanceBigNumber.lt(0.00001)) {
+  if (stakedBalanceBigNumber.lt(0.00001) && stakedBalanceBigNumber.gt(0)) {
     return '< 0.00001'
   }
   return stakedBalanceBigNumber.toFixed(5, BigNumber.ROUND_DOWN)

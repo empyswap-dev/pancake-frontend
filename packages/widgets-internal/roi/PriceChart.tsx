@@ -6,7 +6,7 @@ import { SpaceProps } from "styled-system";
 import {
   Flex,
   ButtonMenuItem,
-  SwapLineChart,
+  PairPriceChart,
   PairDataTimeWindowEnum,
   Box,
   Text,
@@ -36,7 +36,7 @@ interface Props {
 export const PriceChart = memo(function PriceChart({
   prices,
   onSpanChange,
-  span = 0,
+  span = 1,
   priceUpper,
   priceLower,
   priceCurrent,
@@ -64,7 +64,7 @@ export const PriceChart = memo(function PriceChart({
   const chart =
     prices && prices.length ? (
       <Box mt="0.5em" width="100%" height="200px">
-        <SwapLineChart
+        <PairPriceChart
           data={prices}
           isChangePositive
           isChartExpanded={false}
@@ -129,6 +129,10 @@ function TimeSpans({
   const { t } = useTranslation();
   const SPAN = useMemo(
     () => [
+      {
+        key: PairDataTimeWindowEnum.HOUR,
+        text: t("1H"),
+      },
       {
         key: PairDataTimeWindowEnum.DAY,
         text: t("24H"),

@@ -1,16 +1,19 @@
+import { ChainId } from '@pancakeswap/chains'
 import { useWeb3React } from '@pancakeswap/wagmi'
+import { CHAIN_QUERY_NAME, getChainId } from 'config/chains'
+import { PERSIST_CHAIN_KEY } from 'config/constants'
+import { EXCHANGE_PAGE_PATHS } from 'config/constants/exchange'
 import { useRouter } from 'next/router'
 import { useEffect, useRef } from 'react'
-import { EXCHANGE_PAGE_PATHS } from 'config/constants/exchange'
-import { isChainSupported } from 'utils/wagmi'
-import { ChainId } from '@pancakeswap/chains'
-import { CHAIN_QUERY_NAME, getChainId } from 'config/chains'
+import { useAccount } from 'wagmi'
 import { getHashFromRouter } from 'utils/getHashFromRouter'
+import { isChainSupported } from 'utils/wagmi'
 import { useActiveChainId } from './useActiveChainId'
 import { useSwitchNetworkLoading } from './useSwitchNetworkLoading'
 
 export function useNetworkConnectorUpdater() {
   const { chainId } = useActiveChainId()
+  const { chainId: wagmiChainId } = useAccount()
   const previousChainIdRef = useRef(chainId)
   const [loading] = useSwitchNetworkLoading()
   const router = useRouter()
@@ -23,9 +26,12 @@ export function useNetworkConnectorUpdater() {
     const parsedQueryChainId = getChainId(router.query.chain as string)
 
     if (!parsedQueryChainId && chainId === ChainId.BSC) return setPrevChainId()
-    if (parsedQueryChainId !== chainId && isChainSupported(chainId)) {
+    if (router.query[PERSIST_CHAIN_KEY]) {
+      return setPrevChainId()
+    }
+    if (parsedQueryChainId !== wagmiChainId && wagmiChainId && isChainSupported(wagmiChainId)) {
       const removeQueriesFromPath =
-        previousChainIdRef.current !== chainId &&
+        previousChainIdRef.current !== wagmiChainId &&
         EXCHANGE_PAGE_PATHS.some((item) => {
           return router.pathname.startsWith(item)
         })
@@ -35,7 +41,7 @@ export function useNetworkConnectorUpdater() {
         {
           query: {
             ...(!removeQueriesFromPath && omittedQuery),
-            chain: CHAIN_QUERY_NAME[chainId],
+            chain: CHAIN_QUERY_NAME[wagmiChainId],
           },
           ...(uriHash && { hash: uriHash }),
         },
@@ -47,7 +53,7 @@ export function useNetworkConnectorUpdater() {
       )
     }
     return setPrevChainId()
-  }, [chainId, loading, router])
+  }, [wagmiChainId, chainId, loading, router])
 }
 
 /**

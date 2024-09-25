@@ -17,6 +17,7 @@ import {
   LinkExternal,
   Text,
   Toggle,
+  useConfirm,
   useTooltip,
 } from '@pancakeswap/uikit'
 import { ListLogo } from '@pancakeswap/widgets-internal'
@@ -80,12 +81,14 @@ const ListRow = memo(function ListRow({ listUrl }: { listUrl: string }) {
     dispatch(acceptListUpdate(listUrl))
   }, [dispatch, listUrl, pending])
 
+  const confirm = useConfirm()
+
   const handleRemoveList = useCallback(() => {
-    // eslint-disable-next-line no-alert
-    if (window.confirm('Please confirm you would like to remove this list')) {
-      dispatch(removeList(listUrl))
-    }
-  }, [dispatch, listUrl])
+    confirm({
+      message: 'Please confirm you would like to remove this list',
+      onConfirm: (confirmed) => confirmed && dispatch(removeList(listUrl)),
+    })
+  }, [confirm, dispatch, listUrl])
 
   const handleEnableList = useCallback(() => {
     dispatch(enableList(listUrl))
@@ -205,7 +208,7 @@ function ManageLists({
         // only show loaded lists, hide unsupported lists
         const isValid = Boolean(lists[listUrl].current) && !UNSUPPORTED_LIST_URLS.includes(listUrl)
 
-        if (isValid) {
+        if (isValid && chainId) {
           return MULTI_CHAIN_LIST_URLS[chainId]?.includes(listUrl)
         }
 

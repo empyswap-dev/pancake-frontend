@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Currency, CurrencyAmount, Percent } from '@pancakeswap/aptos-swap-sdk'
-import { useAccount, useAccountBalance } from '@pancakeswap/awgmi'
+import { useAccount, useBalance } from '@pancakeswap/awgmi'
 import { useIsMounted } from '@pancakeswap/hooks'
 import { useCurrencyBalance } from 'hooks/Balances'
 import useStablePrice from 'hooks/useStablePrice'
@@ -74,7 +74,7 @@ export const CurrencyInputPanel = ({
   const isMounted = useIsMounted()
   const { t } = useTranslation()
 
-  const { data, isLoading } = useAccountBalance({
+  const { data, isLoading } = useBalance({
     address: account?.address,
     coin: currency?.wrapped?.address,
     enabled: !!currency,
@@ -181,8 +181,8 @@ export const CurrencyInputPanel = ({
                   onPercentInput &&
                   [25, 50, 75].map((percent) => {
                     const isAtCurrentPercent =
-                      (maxAmount && value === percentAmount[percent]) || (lpPercent && lpPercent === percent.toString())
-
+                      (maxAmount && value !== '0' && value === percentAmount[percent]) ||
+                      (lpPercent && lpPercent === percent.toString())
                     return (
                       <Button
                         key={`btn_quickCurrency${percent}`}

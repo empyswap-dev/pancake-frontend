@@ -1,36 +1,36 @@
+import { useTranslation } from '@pancakeswap/localization'
 import {
-  Text,
-  Flex,
   Box,
   Button,
-  ButtonMenuItem,
   ButtonMenu,
-  useMatchBreakpoints,
-  UnlockIcon,
+  ButtonMenuItem,
+  Flex,
   LockIcon,
+  Text,
+  UnlockIcon,
+  useMatchBreakpoints,
 } from '@pancakeswap/uikit'
-import { Pool, CurrencyLogo } from '@pancakeswap/widgets-internal'
-import { StyledCell } from 'views/Pools/components/PoolsTable/Cells/NameCell'
-import { useTranslation } from '@pancakeswap/localization'
-import React from 'react'
+import { CurrencyLogo, Pool } from '@pancakeswap/widgets-internal'
 import Divider from 'components/Divider'
+import React from 'react'
+import { StyledCell } from 'views/Pools/components/PoolsTable/Cells/NameCell'
 
+import { CurrencyAmount } from '@pancakeswap/swap-sdk-core'
+import { LightGreyCard } from 'components/Card'
 import {
   ActionContainer,
   InfoSection,
   StyledActionPanel,
 } from 'views/Pools/components/PoolsTable/ActionPanel/ActionPanel'
-import { LightGreyCard } from 'components/Card'
-import { CurrencyAmount } from '@pancakeswap/swap-sdk-core'
 
-import { PoolGroup, StakedPosition } from '../type'
-import { InlineText } from './InlineText'
-import { FixedStakingModal } from './FixedStakingModal'
-import { AmountWithUSDSub } from './AmountWithUSDSub'
-import { AprFooter } from './AprFooter'
-import { StakedPositionSection } from './StakedPositionSection'
 import useSelectedPeriod from '../hooks/useSelectedPeriod'
+import { PoolGroup, StakedPosition } from '../type'
+import { AmountWithUSDSub } from './AmountWithUSDSub'
 import AprCell from './AprCell'
+import { AprFooter } from './AprFooter'
+import { FixedStakingModal } from './FixedStakingModal'
+import { InlineText } from './InlineText'
+import { StakedPositionSection } from './StakedPositionSection'
 
 const FixedStakingRow = ({ pool, stakedPositions }: { pool: PoolGroup; stakedPositions: StakedPosition[] }) => {
   const { t } = useTranslation()
@@ -161,14 +161,16 @@ const FixedStakingRow = ({ pool, stakedPositions }: { pool: PoolGroup; stakedPos
                     <FixedStakingModal
                       setSelectedPeriodIndex={setSelectedPeriodIndex}
                       key={selectedPeriodIndex}
-                      initialLockPeriod={
-                        selectedPeriodIndex !== null ? pool.pools[selectedPeriodIndex].lockPeriod : undefined
-                      }
+                      initialLockPeriod={selectedPool?.lockPeriod}
                       pools={pool.pools}
                       stakingToken={pool.token}
                       stakedPositions={stakedPositions}
                     >
-                      {(openModal) => <Button onClick={openModal}>{t('Stake')}</Button>}
+                      {(openModal) => (
+                        <Button disabled onClick={openModal}>
+                          {t('Stake')}
+                        </Button>
+                      )}
                     </FixedStakingModal>
                   </LightGreyCard>
                 </ActionContainer>

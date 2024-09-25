@@ -1,50 +1,37 @@
-import { gql, GraphQLClient } from 'graphql-request'
-
-export const POOLS_FOR_TOKEN = gql`
-  query topPools($address: String!) {
-    asToken0: pools(first: 200, orderBy: totalValueLockedUSD, orderDirection: desc, where: { token0: $address }) {
-      id
-    }
-    asToken1: pools(first: 200, orderBy: totalValueLockedUSD, orderDirection: desc, where: { token1: $address }) {
-      id
-    }
-  }
-`
-
-interface PoolsForTokenResponse {
-  asToken0: {
-    id: string
-  }[]
-  asToken1: {
-    id: string
-  }[]
-}
+import { explorerApiClient } from 'state/info/api/client'
+import { components } from 'state/info/api/schema'
+import { PoolData } from 'views/V3Info/types'
+import { transformPoolData } from 'views/V3Info/utils'
 
 /**
  * Fetch top addresses by volume
  */
 export async function fetchPoolsForToken(
   address: string,
-  client: GraphQLClient,
-): Promise<{
-  error: boolean
-  addresses: string[] | undefined
-}> {
+  chainName: components['schemas']['ChainName'],
+  signal: AbortSignal,
+): Promise<{ error: boolean; data: PoolData[] }> {
   try {
-    const data = await client.request<PoolsForTokenResponse>(POOLS_FOR_TOKEN, {
-      address,
+    const data = await explorerApiClient.GET('/cached/pools/v3/{chainName}/list/top', {
+      signal,
+      params: {
+        path: {
+          chainName,
+        },
+        query: {
+          token: address,
+        },
+      },
     })
 
-    const formattedData = data.asToken0.concat(data.asToken1).map((p) => p.id)
-
     return {
+      data: data.data?.map(transformPoolData) ?? [],
       error: false,
-      addresses: formattedData,
     }
   } catch {
     return {
       error: true,
-      addresses: undefined,
+      data: [],
     }
   }
 }

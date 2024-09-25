@@ -1,6 +1,6 @@
-import { Currency, CurrencyAmount, Fraction, Percent, Price, Token } from '@pancakeswap/sdk'
 import { ChainId } from '@pancakeswap/chains'
 import { isActiveV3Farm } from '@pancakeswap/farms'
+import { Currency, CurrencyAmount, Fraction, Percent, Price, Token } from '@pancakeswap/sdk'
 import {
   AtomBox,
   AutoColumn,
@@ -12,71 +12,76 @@ import {
   ExpandableLabel,
   Flex,
   Heading,
-  NextLinkFromReactRouter,
+  Message,
   NotFound,
   PreTitle,
   RowBetween,
+  ScanLink,
   Spinner,
   SyncAltIcon,
   Tag,
   Text,
   Toggle,
-  Message,
   useMatchBreakpoints,
   useModal,
-  ScanLink,
 } from '@pancakeswap/uikit'
-import { ConfirmationModalContent } from '@pancakeswap/widgets-internal'
 
-import { MasterChefV3, NonfungiblePositionManager, Position } from '@pancakeswap/v3-sdk'
-import { AppHeader } from 'components/App'
-import { useToken } from 'hooks/Tokens'
-import { useFarm } from 'hooks/useFarm'
-import { useStablecoinPrice } from 'hooks/useBUSDPrice'
-import { useMasterchefV3, useV3NFTPositionManagerContract } from 'hooks/useContract'
-import useIsTickAtLimit from 'hooks/v3/useIsTickAtLimit'
-import { usePool } from 'hooks/v3/usePools'
-import { NextSeo } from 'next-seo'
-// import { usePositionTokenURI } from 'hooks/v3/usePositionTokenURI'
+import { ConfirmationModalContent, NextLinkFromReactRouter } from '@pancakeswap/widgets-internal'
+
 import { Trans, useTranslation } from '@pancakeswap/localization'
+import { MasterChefV3, NonfungiblePositionManager, Pool, Position, isPoolTickInRange } from '@pancakeswap/v3-sdk'
+import { useQuery } from '@tanstack/react-query'
+import { AppHeader } from 'components/App'
 import { LightGreyCard } from 'components/Card'
-import FormattedCurrencyAmount from 'components/Chart/FormattedCurrencyAmount/FormattedCurrencyAmount'
+import FormattedCurrencyAmount from 'components/FormattedCurrencyAmount/FormattedCurrencyAmount'
 import { CurrencyLogo, DoubleCurrencyLogo } from 'components/Logo'
+import { MerklSection } from 'components/Merkl/MerklSection'
+import { MerklTag } from 'components/Merkl/MerklTag'
 import { RangePriceSection } from 'components/RangePriceSection'
 import { RangeTag } from 'components/RangeTag'
 import TransactionConfirmationModal from 'components/TransactionConfirmationModal'
 import { Bound } from 'config/constants/types'
+import dayjs from 'dayjs'
 import { gql } from 'graphql-request'
+import { useToken } from 'hooks/Tokens'
+import useAccountActiveChain from 'hooks/useAccountActiveChain'
 import { useActiveChainId } from 'hooks/useActiveChainId'
+import { useMasterchefV3, useV3NFTPositionManagerContract } from 'hooks/useContract'
+import { useFarm } from 'hooks/useFarm'
+import { useMerklInfo } from 'hooks/useMerkl'
 import useNativeCurrency from 'hooks/useNativeCurrency'
+import { useStablecoinPrice } from 'hooks/useStablecoinPrice'
 import { PoolState } from 'hooks/v3/types'
+import useIsTickAtLimit from 'hooks/v3/useIsTickAtLimit'
+import { usePool } from 'hooks/v3/usePools'
 import { useV3PositionFees } from 'hooks/v3/useV3PositionFees'
 import { useV3PositionFromTokenId, useV3TokenIdsByAccount } from 'hooks/v3/useV3Positions'
 import { formatTickPrice } from 'hooks/v3/utils/formatTickPrice'
 import getPriceOrderingFromPositionForUI from 'hooks/v3/utils/getPriceOrderingFromPositionForUI'
 import { GetStaticPaths, GetStaticProps } from 'next'
+import { NextSeo } from 'next-seo'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { memo, ReactNode, useCallback, useMemo, useState } from 'react'
+import { ReactNode, memo, useCallback, useMemo, useState } from 'react'
+import { ChainLinkSupportChains } from 'state/info/constant'
 import { useSingleCallResult } from 'state/multicall/hooks'
 import { useIsTransactionPending, useTransactionAdder } from 'state/transactions/hooks'
 import { styled } from 'styled-components'
-import useSWRImmutable from 'swr/immutable'
 import { calculateGasMargin, getBlockExploreLink } from 'utils'
 import currencyId from 'utils/currencyId'
 import { formatCurrencyAmount, formatPrice } from 'utils/formatCurrencyAmount'
 import { v3Clients } from 'utils/graphql'
+import { isUserRejected } from 'utils/sentry'
+import { transactionErrorToUserReadableMessage } from 'utils/transactionErrorToUserReadableMessage'
+import { getViemClients } from 'utils/viem'
 import { CHAIN_IDS } from 'utils/wagmi'
 import { unwrappedToken } from 'utils/wrappedCurrency'
-import { AprCalculator } from 'views/AddLiquidityV3/components/AprCalculator'
+import { hexToBigInt } from 'viem'
+import { AprCalculatorV2 } from 'views/AddLiquidityV3/components/AprCalculatorV2'
 import RateToggle from 'views/AddLiquidityV3/formViews/V3FormView/components/RateToggle'
 import Page from 'views/Page'
 import { useSendTransaction, useWalletClient } from 'wagmi'
-import dayjs from 'dayjs'
-import useAccountActiveChain from 'hooks/useAccountActiveChain'
-import { hexToBigInt } from 'viem'
-import { getViemClients } from 'utils/viem'
-import isPoolTickInRange from 'utils/isPoolTickInRange'
-import { ChainLinkSupportChains } from 'state/info/constant'
+import { usePoolInfo } from 'state/farmsV4/state/extendPools/hooks'
 
 export const BodyWrapper = styled(Card)`
   border-radius: 24px;
@@ -111,35 +116,64 @@ const useInverter = ({
   }
 }
 
-// function getRatio(
-//   lower: Price<Currency, Currency>,
-//   current: Price<Currency, Currency>,
-//   upper: Price<Currency, Currency>,
-// ) {
-//   try {
-//     if (!current.greaterThan(lower)) {
-//       return 100
-//     }
+function PositionPriceSection({
+  priceUpper,
+  currencyQuote,
+  currencyBase,
+  isMobile,
+  priceLower,
+  inverted,
+  pool,
+  tickAtLimit,
+  setManuallyInverted,
+  manuallyInverted,
+}) {
+  const {
+    t,
+    currentLanguage: { locale },
+  } = useTranslation()
 
-//     if (!current.lessThan(upper)) {
-//       return 0
-//     }
-
-//     const a = Number.parseFloat(lower.toSignificant(15))
-//     const b = Number.parseFloat(upper.toSignificant(15))
-//     const c = Number.parseFloat(current.toSignificant(15))
-
-//     const ratio = Math.floor((1 / ((Math.sqrt(a * b) - Math.sqrt(b * c)) / (c - Math.sqrt(b * c)) + 1)) * 100)
-
-//     if (ratio < 0 || ratio > 100) {
-//       throw Error('Out of range')
-//     }
-
-//     return ratio
-//   } catch {
-//     return undefined
-//   }
-// }
+  return (
+    <>
+      <AutoRow justifyContent="space-between" mb="16px" mt="24px">
+        <Text fontSize="12px" color="secondary" bold textTransform="uppercase">
+          {t('Price Range')}
+        </Text>
+        {currencyBase && currencyQuote && (
+          <RateToggle currencyA={currencyBase} handleRateToggle={() => setManuallyInverted(!manuallyInverted)} />
+        )}
+      </AutoRow>
+      <AutoRow mb="8px">
+        <Flex alignItems="center" justifyContent="space-between" width="100%" flexWrap={['wrap', 'wrap', 'nowrap']}>
+          <RangePriceSection
+            mr={['0', '0', '16px']}
+            mb={['8px', '8px', '0']}
+            title={t('Min Price')}
+            price={formatTickPrice(priceLower, tickAtLimit, Bound.LOWER, locale)}
+            currency0={currencyQuote}
+            currency1={currencyBase}
+          />
+          {isMobile ? null : <SyncAltIcon width="24px" mx="16px" />}
+          <RangePriceSection
+            ml={['0', '0', '16px']}
+            title={t('Max Price')}
+            price={formatTickPrice(priceUpper, tickAtLimit, Bound.UPPER, locale)}
+            currency0={currencyQuote}
+            currency1={currencyBase}
+          />
+        </Flex>
+      </AutoRow>
+      {pool && currencyQuote && currencyBase ? (
+        <RangePriceSection
+          title={t('Current Price')}
+          currency0={currencyQuote}
+          currency1={currencyBase}
+          price={formatPrice(inverted ? pool.token1Price : pool.token0Price, 6, locale)}
+        />
+      ) : null}
+    </>
+  )
+}
 
 export default function PoolPage() {
   const {
@@ -148,6 +182,7 @@ export default function PoolPage() {
   } = useTranslation()
 
   const [collecting, setCollecting] = useState<boolean>(false)
+  const [errorMessage, setErrorMessage] = useState<string | undefined>()
   const [collectMigrationHash, setCollectMigrationHash] = useState<string | null>(null)
   const [receiveWNATIVE, setReceiveWNATIVE] = useState(false)
 
@@ -197,6 +232,10 @@ export default function PoolPage() {
     return undefined
   }, [liquidity, pool, tickLower, tickUpper])
 
+  const poolAddress = useMemo(() => pool && Pool.getAddress(pool.token0, pool.token1, pool.fee), [pool])
+
+  const poolInfo = usePoolInfo({ poolAddress, chainId })
+
   const tickAtLimit = useIsTickAtLimit(feeAmount, tickLower, tickUpper)
 
   const pricesFromPosition = getPriceOrderingFromPositionForUI(position)
@@ -215,16 +254,6 @@ export default function PoolPage() {
   const inverted = token1 && base ? base.equals(token1) : undefined
   const currencyQuote = inverted ? currency0 : currency1
   const currencyBase = inverted ? currency1 : currency0
-
-  // const ratio = useMemo(() => {
-  //   return priceLower && pool && priceUpper
-  //     ? getRatio(
-  //         inverted ? priceUpper.invert() : priceLower,
-  //         pool.token0Price,
-  //         inverted ? priceLower.invert() : priceUpper,
-  //       )
-  //     : undefined
-  // }, [inverted, pool, priceLower, priceUpper])
 
   // fees
   const [feeValue0, feeValue1] = useV3PositionFees(pool ?? undefined, positionDetails?.tokenId, receiveWNATIVE)
@@ -283,6 +312,10 @@ export default function PoolPage() {
   const manager = isStakedInMCv3 ? masterchefV3 : positionManager
   const interfaceManager = isStakedInMCv3 ? MasterChefV3 : NonfungiblePositionManager
 
+  const handleDismissConfirmation = useCallback(() => {
+    setErrorMessage(undefined)
+  }, [])
+
   const collect = useCallback(() => {
     if (
       tokenIdsInMCv3Loading ||
@@ -315,22 +348,22 @@ export default function PoolPage() {
     }
 
     getViemClients({ chainId })
-      .estimateGas(txn)
-      .then((estimate) => {
+      ?.estimateGas(txn)
+      .then(async (estimate) => {
         const newTxn = {
           ...txn,
           gas: calculateGasMargin(estimate),
         }
 
-        return sendTransactionAsync(newTxn).then((response) => {
-          setCollectMigrationHash(response.hash)
+        return sendTransactionAsync(newTxn).then((hash) => {
+          setCollectMigrationHash(hash)
           setCollecting(false)
 
           const amount0 = feeValue0 ?? CurrencyAmount.fromRawAmount(currency0ForFeeCollectionPurposes, 0)
           const amount1 = feeValue1 ?? CurrencyAmount.fromRawAmount(currency1ForFeeCollectionPurposes, 0)
 
           addTransaction(
-            { hash: response.hash },
+            { hash },
             {
               type: 'collect-fee',
               summary: `Collect fee ${amount0.toExact()} ${
@@ -341,6 +374,11 @@ export default function PoolPage() {
         })
       })
       ?.catch((error) => {
+        if (isUserRejected(error)) {
+          setErrorMessage(t('Transaction rejected'))
+        } else {
+          setErrorMessage(transactionErrorToUserReadableMessage(error, t))
+        }
         setCollecting(false)
         console.error(error)
       })
@@ -358,12 +396,13 @@ export default function PoolPage() {
     signer,
     sendTransactionAsync,
     addTransaction,
+    t,
   ])
 
   const owner = useSingleCallResult({
-    contract: tokenId ? positionManager : null,
+    contract: tokenId && positionManager ? positionManager : undefined,
     functionName: 'ownerOf',
-    args: useMemo(() => [tokenId] as const, [tokenId]),
+    args: useMemo(() => [tokenId] as [bigint], [tokenId]),
   }).result
   const ownsNFT = owner === account || positionDetails?.operator === account
 
@@ -422,7 +461,9 @@ export default function PoolPage() {
     <TransactionConfirmationModal
       title={t('Claim fees')}
       attemptingTxn={collecting}
+      customOnDismiss={handleDismissConfirmation}
       hash={collectMigrationHash ?? ''}
+      errorMessage={errorMessage}
       content={() => (
         <ConfirmationModalContent
           topContent={modalHeader}
@@ -437,7 +478,7 @@ export default function PoolPage() {
     />,
     true,
     true,
-    'TransactionConfirmationModalColelctFees',
+    'TransactionConfirmationModalCollectFees',
   )
 
   const isLoading = loading || poolState === PoolState.LOADING || poolState === PoolState.INVALID || !feeAmount
@@ -446,12 +487,18 @@ export default function PoolPage() {
 
   const isOwnNFT = isStakedInMCv3 || ownsNFT
 
+  const { hasMerkl } = useMerklInfo(poolAddress)
+
   if (!isLoading && poolState === PoolState.NOT_EXISTS) {
-    return <NotFound />
+    return (
+      <NotFound LinkComp={Link}>
+        <NextSeo title="404" />
+      </NotFound>
+    )
   }
 
   const farmingTips =
-    inRange && ownsNFT && hasActiveFarm && !isStakedInMCv3 ? (
+    inRange && ownsNFT && hasActiveFarm && !isStakedInMCv3 && !hasMerkl ? (
       <Message variant="primary" mb="2em">
         <Box>
           <Text display="inline" bold mr="0.25em">{`${currencyQuote?.symbol}-${currencyBase?.symbol}`}</Text>
@@ -460,7 +507,7 @@ export default function PoolPage() {
               'has an active PancakeSwap farm. Stake your position in the farm to start earning with the indicated APR with CAKE farming.',
             )}
           </Text>
-          <NextLinkFromReactRouter to="/farms">
+          <NextLinkFromReactRouter to="/liquidity/pools">
             <Text display="inline" bold ml="0.25em" style={{ textDecoration: 'underline' }}>
               {t('Go to Farms')} {' >>'}
             </Text>
@@ -481,7 +528,7 @@ export default function PoolPage() {
           <>
             <AppHeader
               title={
-                <Box mb={['8px', '8px', 0]} width="100%" style={{ flex: 1 }} minWidth={['auto', , 'max-content']}>
+                <Box mb={['8px', '8px', 0]} width="100%" style={{ flex: 1 }} minWidth={['auto', 'auto', 'max-content']}>
                   <Flex alignItems="center">
                     <DoubleCurrencyLogo size={24} currency0={currencyQuote} currency1={currencyBase} />
                     <Heading as="h2" ml="8px">
@@ -497,6 +544,7 @@ export default function PoolPage() {
                         <RangeTag ml="8px" removed={removed} outOfRange={!inRange} />
                       </>
                     )}
+                    <MerklTag poolAddress={poolAddress} />
                   </Flex>
                   <RowBetween gap="16px" flexWrap="nowrap">
                     <Text fontSize="14px" color="textSubtle" style={{ wordBreak: 'break-word' }}>
@@ -505,18 +553,18 @@ export default function PoolPage() {
                     </Text>
                     {isMobile && (
                       <Flex>
-                        {isStakedInMCv3 && (
+                        {isStakedInMCv3 ? (
                           <Tag mr="8px" outline variant="warning">
                             {t('Farming')}
                           </Tag>
-                        )}
+                        ) : null}
                         <RangeTag removed={removed} outOfRange={!inRange} />
                       </Flex>
                     )}
                   </RowBetween>
                 </Box>
               }
-              backTo="/liquidity"
+              backTo="/liquidity/positions"
               noConfig
               buttons={
                 !isMobile &&
@@ -572,17 +620,7 @@ export default function PoolPage() {
                 >
                   <Box width="100%" mb={['8px', '8px', 0]} position="relative">
                     <Flex position="absolute" right={0}>
-                      <AprCalculator
-                        allowApply={false}
-                        showQuestion
-                        baseCurrency={currencyBase}
-                        quoteCurrency={currencyQuote}
-                        feeAmount={feeAmount}
-                        positionDetails={positionDetails}
-                        defaultDepositUsd={fiatValueOfLiquidity?.toFixed(2)}
-                        tokenAmount0={inRange ? position?.amount0 : undefined}
-                        tokenAmount1={inRange ? position?.amount1 : undefined}
-                      />
+                      <AprCalculatorV2 tokenId={BigInt(tokenId ?? 0)} pool={poolInfo} />
                     </Flex>
                     <Text fontSize="12px" color="secondary" bold textTransform="uppercase">
                       {t('Liquidity')}
@@ -736,50 +774,39 @@ export default function PoolPage() {
                   </Flex>
                 </Flex>
               )}
-              <AutoRow justifyContent="space-between" mb="16px" mt="24px">
-                <Text fontSize="12px" color="secondary" bold textTransform="uppercase">
-                  {t('Price Range')}
-                </Text>
-                {currencyBase && currencyQuote && (
-                  <RateToggle
-                    currencyA={currencyBase}
-                    handleRateToggle={() => setManuallyInverted(!manuallyInverted)}
+              <Flex flexWrap={['wrap', 'wrap', 'wrap', 'nowrap']}>
+                <Box width="100%">
+                  <PositionPriceSection
+                    manuallyInverted={manuallyInverted}
+                    setManuallyInverted={setManuallyInverted}
+                    currencyQuote={currencyQuote}
+                    currencyBase={currencyBase}
+                    isMobile={isMobile}
+                    priceLower={priceLower}
+                    inverted={inverted}
+                    pool={pool}
+                    priceUpper={priceUpper}
+                    tickAtLimit={tickAtLimit}
                   />
-                )}
-              </AutoRow>
-              <AutoRow mb="8px">
-                <Flex
-                  alignItems="center"
-                  justifyContent="space-between"
-                  width="100%"
-                  flexWrap={['wrap', 'wrap', 'nowrap']}
-                >
-                  <RangePriceSection
-                    mr={['0', '0', '16px']}
-                    mb={['8px', '8px', '0']}
-                    title={t('Min Price')}
-                    price={formatTickPrice(priceLower, tickAtLimit, Bound.LOWER, locale)}
-                    currency0={currencyQuote}
-                    currency1={currencyBase}
-                  />
-                  {isMobile ? null : <SyncAltIcon width="24px" mx="16px" />}
-                  <RangePriceSection
-                    ml={['0', '0', '16px']}
-                    title={t('Max Price')}
-                    price={formatTickPrice(priceUpper, tickAtLimit, Bound.UPPER, locale)}
-                    currency0={currencyQuote}
-                    currency1={currencyBase}
-                  />
-                </Flex>
-              </AutoRow>
-              {pool && currencyQuote && currencyBase ? (
-                <RangePriceSection
-                  title={t('Current Price')}
-                  currency0={currencyQuote}
-                  currency1={currencyBase}
-                  price={formatPrice(inverted ? pool.token1Price : pool.token0Price, 6, locale)}
+                </Box>
+
+                <MerklSection
+                  disabled={!isOwnNFT}
+                  outRange={!inRange}
+                  notEnoughLiquidity={Boolean(
+                    fiatValueOfLiquidity
+                      ? fiatValueOfLiquidity.lessThan(
+                          // NOTE: if Liquidity is lessage 20$, can't participate in Merkl
+                          new Fraction(
+                            BigInt(20) * fiatValueOfLiquidity.decimalScale * fiatValueOfLiquidity.denominator,
+                            fiatValueOfLiquidity?.denominator,
+                          ),
+                        )
+                      : false,
+                  )}
+                  poolAddress={poolAddress}
                 />
-              ) : null}
+              </Flex>
               {positionDetails && currency0 && currency1 && (
                 <PositionHistory
                   tokenId={positionDetails.tokenId.toString()}
@@ -796,6 +823,7 @@ export default function PoolPage() {
 }
 
 PoolPage.chains = CHAIN_IDS
+PoolPage.screen = true
 
 type PositionTX = {
   id: string
@@ -831,9 +859,10 @@ function PositionHistory_({
   const [isExpanded, setIsExpanded] = useState(false)
   const { chainId } = useActiveChainId()
   const client = v3Clients[chainId as ChainId]
-  const { data, isLoading } = useSWRImmutable(
-    client && tokenId && ['positionHistory', chainId, tokenId],
-    async () => {
+  const { data, isPending } = useQuery({
+    queryKey: ['positionHistory', chainId, tokenId],
+
+    queryFn: async () => {
       const result = await client.request<PositionHistoryResult>(
         gql`
           query positionHistory($tokenId: String!) {
@@ -872,19 +901,17 @@ function PositionHistory_({
 
       return result.positionSnapshots.filter((snapshot) => {
         const { transaction } = snapshot
-        if (transaction.mints.length > 0 || transaction.burns.length > 0 || transaction.collects.length > 0) {
-          return true
-        }
-        return false
+        return transaction.mints.length > 0 || transaction.burns.length > 0 || transaction.collects.length > 0
       })
     },
-    {
-      revalidateOnMount: true,
-      refreshInterval: 30_000,
-    },
-  )
 
-  if (isLoading || !data?.length) {
+    enabled: Boolean(client && tokenId),
+    refetchInterval: 30_000,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+  })
+
+  if (isPending || !data?.length) {
     return null
   }
 
@@ -986,7 +1013,7 @@ function PositionHistoryRow({
   currency0,
   currency1,
 }: {
-  chainId: ChainId
+  chainId?: ChainId
   positionTx: PositionTX
   type: PositionHistoryType
   currency0: Currency
@@ -1028,7 +1055,7 @@ function PositionHistoryRow({
       <Box>
         <AutoRow>
           <ScanLink
-            useBscCoinFallback={ChainLinkSupportChains.includes(chainId)}
+            useBscCoinFallback={chainId ? ChainLinkSupportChains.includes(chainId) : false}
             href={getBlockExploreLink(positionTx.id, 'transaction', chainId)}
           >
             <Flex flexDirection="column" alignItems="center">
@@ -1045,7 +1072,7 @@ function PositionHistoryRow({
                 <AtomBox minWidth="24px">
                   <CurrencyLogo currency={currency0} />
                 </AtomBox>
-                <Text display={['none', , 'block']}>{currency0.symbol}</Text>
+                <Text display={['none', 'none', 'block']}>{currency0.symbol}</Text>
               </AutoRow>
               <Text bold ellipsis title={positionTx.amount0}>
                 {isPlus ? '+' : '-'} {position0AmountString}
@@ -1058,7 +1085,7 @@ function PositionHistoryRow({
                 <AtomBox minWidth="24px">
                   <CurrencyLogo currency={currency1} />
                 </AtomBox>
-                <Text display={['none', , 'block']}>{currency1.symbol}</Text>
+                <Text display={['none', 'none', 'block']}>{currency1.symbol}</Text>
               </AutoRow>
               <Text bold ellipsis title={positionTx.amount1}>
                 {isPlus ? '+' : '-'} {position1AmountString}
@@ -1081,7 +1108,7 @@ function PositionHistoryRow({
     >
       <AutoRow justifyContent="center">
         <ScanLink
-          useBscCoinFallback={ChainLinkSupportChains.includes(chainId)}
+          useBscCoinFallback={chainId ? ChainLinkSupportChains.includes(chainId) : false}
           href={getBlockExploreLink(positionTx.id, 'transaction', chainId)}
         >
           <Text ellipsis>{desktopDate}</Text>
@@ -1098,7 +1125,7 @@ function PositionHistoryRow({
               <AtomBox minWidth="24px">
                 <CurrencyLogo currency={currency0} />
               </AtomBox>
-              <Text display={['none', , 'block']}>{currency0.symbol}</Text>
+              <Text display={['none', 'none', 'block']}>{currency0.symbol}</Text>
             </AutoRow>
           </AutoRow>
         )}
@@ -1111,7 +1138,7 @@ function PositionHistoryRow({
               <AtomBox minWidth="24px">
                 <CurrencyLogo currency={currency1} />
               </AtomBox>
-              <Text display={['none', , 'block']}>{currency1.symbol}</Text>
+              <Text display={['none', 'none', 'block']}>{currency1.symbol}</Text>
             </AutoRow>
           </AutoRow>
         )}
@@ -1128,15 +1155,15 @@ export const getStaticPaths: GetStaticPaths = () => {
 }
 
 export const getStaticProps: GetStaticProps = async ({ params }) => {
-  const { tokenId } = params
+  const tokenId = params?.tokenId
 
   const isNumberReg = /^\d+$/
 
-  if (!(tokenId as string)?.match(isNumberReg)) {
+  if (tokenId && !(tokenId as string)?.match(isNumberReg)) {
     return {
       redirect: {
-        statusCode: 303,
-        destination: `/add`,
+        statusCode: 307,
+        destination: '/add',
       },
     }
   }

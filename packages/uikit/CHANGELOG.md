@@ -1,5 +1,135 @@
 # Change Log
 
+## 0.67.1
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.32
+
+## 0.67.0
+
+### Minor Changes
+
+- 4e3ed54: Add MultiSelect Component
+- c9c6c44: Added MiscellaneousIcon
+- 57bac78: Added DefaultTokenIcon and apply it as default token logo
+- 42dfc77: new UIKit: TreeSelect
+- a3ca679: Added FeeTierTooltip component
+
+### Patch Changes
+
+- 6eac78f: update MultiSelect UIKit
+- 76f049e: Add GlassGlobeIcon SVG
+
+## 0.66.1
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.31
+
+## 0.66.0
+
+### Minor Changes
+
+- 54f0f82: Added confirm and prompt webUI & hooks to replace window.confirm & window.prompt
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.30
+
+## 0.65.10
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.29
+
+## 0.65.9
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.28
+
+## 0.65.8
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.27
+
+## 0.65.7
+
+### Patch Changes
+
+- 72c834c: Upgrade viem and wagmi v2
+  - @pancakeswap/hooks@0.0.26
+
+## 0.65.6
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.25
+- @pancakeswap/localization@6.0.3
+
+## 0.65.5
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.24
+- @pancakeswap/localization@6.0.2
+
+## 0.65.4
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.23
+- @pancakeswap/localization@6.0.1
+
+## 0.65.3
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.22
+- @pancakeswap/localization@6.0.0
+
+## 0.65.2
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.21
+- @pancakeswap/localization@5.0.8
+
+## 0.65.1
+
+### Patch Changes
+
+- 2ec03f1b2: chore: Bump up gauges
+
+## 0.65.0
+
+### Minor Changes
+
+- 19eff8951: Remove wagmi and NextLink dependency
+
+## 0.64.3
+
+### Patch Changes
+
+- Updated dependencies [f71904c26]
+  - @pancakeswap/localization@5.0.7
+  - @pancakeswap/hooks@0.0.20
+
+## 0.64.2
+
+### Patch Changes
+
+- @pancakeswap/hooks@0.0.19
+- @pancakeswap/localization@5.0.6
+
+## 0.64.1
+
+### Patch Changes
+
+- 2ceb8e9ff: Dependencies update
+
 ## 0.64.0
 
 ### Minor Changes

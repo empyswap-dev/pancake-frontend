@@ -5,6 +5,8 @@ import {
   CalculateIcon,
   Flex,
   IconButton,
+  LinkExternal,
+  PairDataTimeWindowEnum,
   RocketIcon,
   Skeleton,
   Text,
@@ -13,25 +15,27 @@ import {
   useModalV2,
   useTooltip,
 } from '@pancakeswap/uikit'
+import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
+import { Position, encodeSqrtRatioX96 } from '@pancakeswap/v3-sdk'
 import { FarmWidget } from '@pancakeswap/widgets-internal'
 import { RoiCalculatorModalV2, useRoi } from '@pancakeswap/widgets-internal/roi'
-import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
-import { useCakePrice } from 'hooks/useCakePrice'
-import { Position, encodeSqrtRatioX96 } from '@pancakeswap/v3-sdk'
 import BigNumber from 'bignumber.js'
-import { useMemo, useState } from 'react'
+import { useCakePrice } from 'hooks/useCakePrice'
+import { useContext, useMemo, useState } from 'react'
 import { styled } from 'styled-components'
 
+import isUndefinedOrNull from '@pancakeswap/utils/isUndefinedOrNull'
 import { Bound } from 'config/constants/types'
 import { usePoolAvgInfo } from 'hooks/usePoolAvgInfo'
 import { usePairTokensPrice } from 'hooks/v3/usePairTokensPrice'
 import { useAllV3Ticks } from 'hooks/v3/usePoolTickData'
 import useV3DerivedInfo from 'hooks/v3/useV3DerivedInfo'
+import { type V3Farm } from 'state/farms/types'
 import { useFarmsV3Public } from 'state/farmsV3/hooks'
-import { Field } from 'state/mint/actions'
+import { CurrencyField as Field } from 'utils/types'
 import LiquidityFormProvider from 'views/AddLiquidityV3/formViews/V3FormView/form/LiquidityFormProvider'
 import { useV3FormState } from 'views/AddLiquidityV3/formViews/V3FormView/form/reducer'
-import { V3Farm } from 'views/Farms/FarmsV3'
+import { FarmsV3Context } from 'views/Farms'
 import { USER_ESTIMATED_MULTIPLIER, useUserPositionInfo } from '../../YieldBooster/hooks/bCakeV3/useBCakeV3Info'
 import { BoostStatus, useBoostStatus } from '../../YieldBooster/hooks/bCakeV3/useBoostStatus'
 import { getDisplayApr } from '../../getDisplayApr'
@@ -43,11 +47,39 @@ const ApyLabelContainer = styled(Flex)`
   }
 `
 
+const StyledLi = styled.li`
+  flex-wrap: nowrap;
+  display: flex;
+  gap: 5px;
+  position: relative;
+  padding-left: 22px;
+  &::before {
+    content: '';
+    position: absolute;
+    transform: translateY(-50%);
+    top: 50%;
+    border-radius: 50%;
+    left: 0;
+    width: 6px;
+    height: 6px;
+    background: ${({ theme }) => theme.colors.text};
+  }
+
+  @-moz-document url-prefix() {
+    padding-left: 16px; /* Apply padding-left: 16px in Firefox only */
+  }
+`
+
 type FarmV3ApyButtonProps = {
   farm: V3Farm
   existingPosition?: Position
   isPositionStaked?: boolean
   tokenId?: string
+  additionAprInfo?: {
+    aprValue: number
+    aprTitle: string
+    aprLink: string
+  }
 }
 
 export function FarmV3ApyButton(props: FarmV3ApyButtonProps) {
@@ -58,15 +90,22 @@ export function FarmV3ApyButton(props: FarmV3ApyButtonProps) {
   )
 }
 
-function FarmV3ApyButton_({ farm, existingPosition, isPositionStaked, tokenId }: FarmV3ApyButtonProps) {
+function FarmV3ApyButton_({
+  farm,
+  existingPosition,
+  isPositionStaked,
+  tokenId,
+  additionAprInfo,
+}: FarmV3ApyButtonProps) {
+  const { farmsAvgInfo } = useContext(FarmsV3Context)
   const { token: baseCurrency, quoteToken: quoteCurrency, feeAmount, lpAddress } = farm
   const { t } = useTranslation()
   const roiModal = useModalV2()
 
-  const [priceTimeWindow, setPriceTimeWindow] = useState(0)
-  const prices = usePairTokensPrice(lpAddress, priceTimeWindow, baseCurrency?.chainId)
+  const [priceTimeWindow, setPriceTimeWindow] = useState(PairDataTimeWindowEnum.DAY)
+  const prices = usePairTokensPrice(lpAddress, priceTimeWindow, baseCurrency?.chainId, roiModal.isOpen)
 
-  const { ticks: data } = useAllV3Ticks(baseCurrency, quoteCurrency, feeAmount)
+  const { ticks: data } = useAllV3Ticks(baseCurrency, quoteCurrency, feeAmount, roiModal.isOpen)
 
   const formState = useV3FormState()
 
@@ -92,21 +131,25 @@ function FarmV3ApyButton_({ farm, existingPosition, isPositionStaked, tokenId }:
 
   const { status: boostedStatus } = useBoostStatus(farm.pid, tokenId)
 
-  const {
-    volumeUSD: volume24H,
-    feeUSD,
-    tvlUSD,
-  } = usePoolAvgInfo({
+  const poolAvgInfo = usePoolAvgInfo({
     address: farm.lpAddress,
     chainId: farm.token.chainId,
+    enabled: isUndefinedOrNull(farmsAvgInfo),
   })
+
+  const globalLpApr = !isUndefinedOrNull(farmsAvgInfo) ? farmsAvgInfo?.[farm.lpAddress?.toLowerCase()]?.apr ?? 0 : 0
+  const { volumeUSD: volume24H } = !isUndefinedOrNull(farmsAvgInfo)
+    ? farmsAvgInfo?.[farm.lpAddress?.toLowerCase()] || {
+        volumeUSD: 0,
+        tvlUSD: 0,
+        feeUSD: 0,
+      }
+    : poolAvgInfo
 
   const balanceA =
     (isSorted ? existingPosition?.amount0 : existingPosition?.amount1) ?? currencyBalances[Field.CURRENCY_A]
   const balanceB =
     (isSorted ? existingPosition?.amount1 : existingPosition?.amount0) ?? currencyBalances[Field.CURRENCY_B]
-
-  const globalLpApr = useMemo(() => (tvlUSD ? (100 * feeUSD * 365) / tvlUSD : 0), [feeUSD, tvlUSD])
 
   const depositUsdAsBN = useMemo(
     () =>
@@ -149,7 +192,10 @@ function FarmV3ApyButton_({ farm, existingPosition, isPositionStaked, tokenId }:
       existingPosition
         ? outOfRange
           ? 0
-          : new BigNumber(existingPosition.liquidity.toString()).times(cakeAprFactor).div(depositUsdAsBN).toNumber()
+          : new BigNumber(existingPosition.liquidity.toString())
+              .times(cakeAprFactor)
+              .div(depositUsdAsBN ?? 0)
+              .toNumber()
         : 0,
     [cakeAprFactor, depositUsdAsBN, existingPosition, outOfRange],
   )
@@ -169,27 +215,27 @@ function FarmV3ApyButton_({ farm, existingPosition, isPositionStaked, tokenId }:
   })
 
   const lpApr = existingPosition ? +apr.toFixed(2) : globalLpApr
-  const cakeApr = +farm.cakeApr
+  const cakeApr = +(farm.cakeApr ?? 0)
 
-  const displayApr = getDisplayApr(cakeApr, lpApr)
+  const displayApr = getDisplayApr(cakeApr, lpApr, additionAprInfo?.aprValue)
   const cakeAprDisplay = cakeApr.toFixed(2)
   const positionCakeAprDisplay = positionCakeApr.toFixed(2)
   const lpAprDisplay = lpApr.toFixed(2)
+  const additionalAprDisplay = (additionAprInfo?.aprValue ?? 0).toFixed(2)
   const { isDesktop } = useMatchBreakpoints()
   const {
     data: { boostMultiplier },
   } = useUserPositionInfo(tokenId ?? '-1')
 
   const estimatedAPR = useMemo(() => {
-    return (parseFloat(cakeAprDisplay) * USER_ESTIMATED_MULTIPLIER + parseFloat(lpAprDisplay)).toLocaleString('en-US', {
+    return (
+      parseFloat(cakeAprDisplay) * USER_ESTIMATED_MULTIPLIER +
+      parseFloat(lpAprDisplay) +
+      (additionAprInfo?.aprValue ?? 0)
+    ).toLocaleString('en-US', {
       maximumFractionDigits: 2,
     })
-  }, [cakeAprDisplay, lpAprDisplay])
-  const boostedAPR = useMemo(() => {
-    return (parseFloat(positionCakeAprDisplay) * boostMultiplier + parseFloat(lpAprDisplay)).toLocaleString('en-US', {
-      maximumFractionDigits: 2,
-    })
-  }, [positionCakeAprDisplay, lpAprDisplay, boostMultiplier])
+  }, [cakeAprDisplay, lpAprDisplay, additionAprInfo])
   const canBoosted = useMemo(() => boostedStatus !== BoostStatus.CanNotBoost, [boostedStatus])
   const isBoosted = useMemo(() => boostedStatus === BoostStatus.Boosted, [boostedStatus])
   const positionDisplayApr = getDisplayApr(+positionCakeApr, lpApr)
@@ -216,6 +262,16 @@ function FarmV3ApyButton_({ farm, existingPosition, isPositionStaked, tokenId }:
         <li>
           {t('LP Fee APR')}: <b>{lpAprDisplay}%</b>
         </li>
+        {additionAprInfo && (
+          <StyledLi>
+            <Flex style={{ flexWrap: 'nowrap', alignItems: 'center', gap: 5 }}>
+              {additionAprInfo.aprTitle}: <b>{additionalAprDisplay}%</b>
+              <LinkExternal display="inline-block" href={additionAprInfo.aprLink}>
+                {t('Check')}
+              </LinkExternal>
+            </Flex>
+          </StyledLi>
+        )}
       </ul>
       <br />
       <Text>
@@ -238,7 +294,7 @@ function FarmV3ApyButton_({ farm, existingPosition, isPositionStaked, tokenId }:
         <li>
           {t('Farm APR')}:{' '}
           <b>
-            {isBoosted && <>{(parseFloat(positionCakeAprDisplay) * boostMultiplier).toFixed(2)}% </>}
+            {isBoosted && <>{(positionCakeApr * boostMultiplier).toFixed(2)}% </>}
             <Text
               display="inline-block"
               bold={!isBoosted}
@@ -251,6 +307,14 @@ function FarmV3ApyButton_({ farm, existingPosition, isPositionStaked, tokenId }:
         <li>
           {t('LP Fee APR')}: <b>{lpAprDisplay}%</b>
         </li>
+        {additionAprInfo && (
+          <StyledLi style={{ whiteSpace: 'nowrap', display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 5 }}>
+            {additionAprInfo.aprTitle}: <b>{additionalAprDisplay}%</b>
+            <LinkExternal display="inline-block" href={additionAprInfo.aprLink}>
+              {t('Check')}
+            </LinkExternal>
+          </StyledLi>
+        )}
       </ul>
     </>,
   )
@@ -280,7 +344,7 @@ function FarmV3ApyButton_({ farm, existingPosition, isPositionStaked, tokenId }:
                       <>
                         {isDesktop && <RocketIcon color="success" />}
                         <Text fontSize="14px" color="success">
-                          {boostedAPR}%
+                          {positionBoostedDisplayApr}%
                         </Text>
                       </>
                     )}
@@ -356,6 +420,7 @@ function FarmV3ApyButton_({ farm, existingPosition, isPositionStaked, tokenId }:
           prices={prices}
           priceSpan={priceTimeWindow}
           onPriceSpanChange={setPriceTimeWindow}
+          additionalApr={additionAprInfo?.aprValue}
         />
       )}
     </>

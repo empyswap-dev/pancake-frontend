@@ -1,11 +1,15 @@
+import { deserializeToken } from '@pancakeswap/token-lists'
+import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
+import isUndefinedOrNull from '@pancakeswap/utils/isUndefinedOrNull'
 import BigNumber from 'bignumber.js'
 import dayjs from 'dayjs'
-import { deserializeToken } from '@pancakeswap/token-lists'
-import isUndefinedOrNull from '@pancakeswap/utils/isUndefinedOrNull'
-import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
-import { SerializedFarm, DeserializedFarm } from '../types'
-import { deserializeFarmUserData } from './deserializeFarmUserData'
 import { FARM_AUCTION_HOSTING_IN_SECONDS } from '../const'
+import { DeserializedFarm, SerializedFarm } from '../types'
+import {
+  deserializeFarmBCakePublicData,
+  deserializeFarmBCakeUserData,
+  deserializeFarmUserData,
+} from './deserializeFarmUserData'
 
 export const deserializeFarm = (
   farm: SerializedFarm,
@@ -13,6 +17,7 @@ export const deserializeFarm = (
 ): DeserializedFarm => {
   const {
     lpAddress,
+    lpRewardsApr,
     lpSymbol,
     pid,
     vaultPid,
@@ -27,6 +32,7 @@ export const deserializeFarm = (
     stableSwapAddress,
     stableLpFee,
     stableLpFeeRateOfTotalFee,
+    bCakeWrapperAddress,
   } = farm
 
   const auctionHostingStartDate = !isUndefinedOrNull(auctionHostingStartSeconds)
@@ -45,12 +51,21 @@ export const deserializeFarm = (
       auctionHostingEndDate.getTime() > now
     )
 
+  const bCakeUserData = deserializeFarmBCakeUserData(farm)
+  const bCakePublicData = deserializeFarmBCakePublicData(farm)
   return {
+    bCakeWrapperAddress,
     lpAddress,
+    lpRewardsApr,
     lpSymbol,
     pid,
     vaultPid,
-    dual,
+    ...(dual && {
+      dual: {
+        ...dual,
+        token: deserializeToken(dual?.token),
+      },
+    }),
     multiplier,
     isCommunity: isFarmCommunity,
     auctionHostingEndDate: auctionHostingEndDate?.toJSON(),
@@ -59,6 +74,7 @@ export const deserializeFarm = (
     token: deserializeToken(farm.token),
     quoteToken: deserializeToken(farm.quoteToken),
     userData: deserializeFarmUserData(farm),
+    bCakeUserData,
     tokenAmountTotal: farm.tokenAmountTotal ? new BigNumber(farm.tokenAmountTotal) : BIG_ZERO,
     quoteTokenAmountTotal: farm.quoteTokenAmountTotal ? new BigNumber(farm.quoteTokenAmountTotal) : BIG_ZERO,
     lpTotalInQuoteToken: farm.lpTotalInQuoteToken ? new BigNumber(farm.lpTotalInQuoteToken) : BIG_ZERO,
@@ -72,5 +88,6 @@ export const deserializeFarm = (
     stableLpFee,
     stableLpFeeRateOfTotalFee,
     lpTokenStakedAmount: farm.lpTokenStakedAmount ? new BigNumber(farm.lpTokenStakedAmount) : BIG_ZERO,
+    bCakePublicData,
   }
 }

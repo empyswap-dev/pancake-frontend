@@ -8,7 +8,7 @@ import { useActiveChainId } from 'hooks/useActiveChainId'
 import { useCanBuyCrypto } from 'hooks/useCanBuyCrypto'
 
 interface Props {
-  currency?: Currency
+  currency?: Currency | null
 }
 
 export const BuyCryptoLink = memo(function BuyCryptoInstruction({ currency }: Props) {
@@ -24,7 +24,9 @@ export const BuyCryptoLink = memo(function BuyCryptoInstruction({ currency }: Pr
     <Row alignItems="center" justifyContent="center" mb="4px">
       <Text fontSize="14px">
         {t('Insufficient Funds?')}{' '}
-        <InternalLink href={`/buy-crypto?inputCurrency=${currency.symbol}`}>{t('Buy Crypto here.')}</InternalLink>
+        <InternalLink href={`/buy-crypto?outputCurrency=${currency.symbol}_${chainId}`}>
+          {t('Buy Crypto here.')}
+        </InternalLink>
       </Text>
     </Row>
   )

@@ -1,32 +1,48 @@
 import { useTranslation } from '@pancakeswap/localization'
-import { CHAIN_QUERY_NAME } from 'config/chains'
 import { WalletConnectorNotFoundError, WalletSwitchChainError } from '@pancakeswap/ui-wallets'
-import replaceBrowserHistory from '@pancakeswap/utils/replaceBrowserHistory'
+import { CHAIN_QUERY_NAME } from 'config/chains'
 import { ConnectorNames } from 'config/wallet'
+import { useRouter } from 'next/router'
 import { useCallback } from 'react'
 import { useAppDispatch } from 'state'
-import { ConnectorNotFoundError, SwitchChainNotSupportedError, useConnect, useDisconnect, useNetwork } from 'wagmi'
+import { ConnectorNotFoundError, SwitchChainNotSupportedError, useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useAtom } from 'jotai/index'
 import { clearUserStates } from '../utils/clearUserStates'
-import { useActiveChainId } from './useActiveChainId'
-import { useSessionChainId } from './useSessionChainId'
+import { queryChainIdAtom, useActiveChainId } from './useActiveChainId'
 
 const useAuth = () => {
   const dispatch = useAppDispatch()
   const { connectAsync, connectors } = useConnect()
-  const { chain } = useNetwork()
+  const { chain } = useAccount()
   const { disconnectAsync } = useDisconnect()
   const { chainId } = useActiveChainId()
-  const [, setSessionChainId] = useSessionChainId()
+  const [, setQueryChainId] = useAtom(queryChainIdAtom)
   const { t } = useTranslation()
+  const router = useRouter()
 
   const login = useCallback(
     async (connectorID: ConnectorNames) => {
       const findConnector = connectors.find((c) => c.id === connectorID)
       try {
+        if (!findConnector) return undefined
+
         const connected = await connectAsync({ connector: findConnector, chainId })
-        if (!connected.chain.unsupported && connected.chain.id !== chainId) {
-          replaceBrowserHistory('chain', CHAIN_QUERY_NAME[connected.chain.id])
-          setSessionChainId(connected.chain.id)
+        if (connected.chainId !== chainId) {
+          router.replace(
+            {
+              pathname: router.pathname,
+              query: {
+                ...router.query,
+                chain: CHAIN_QUERY_NAME[connected.chainId],
+              },
+            },
+            undefined,
+            {
+              shallow: true,
+            },
+          )
+
+          setQueryChainId(connected.chainId)
         }
         return connected
       } catch (error) {
@@ -43,7 +59,7 @@ const useAuth = () => {
       }
       return undefined
     },
-    [connectors, connectAsync, chainId, setSessionChainId, t],
+    [connectors, connectAsync, chainId, setQueryChainId, t, router],
   )
 
   const logout = useCallback(async () => {

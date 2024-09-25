@@ -4,52 +4,54 @@ import { Currency, CurrencyAmount, Percent } from '@pancakeswap/sdk'
 import { AutoColumn, Box, Button, CardBody, useModal } from '@pancakeswap/uikit'
 import { ConfirmationModalContent } from '@pancakeswap/widgets-internal'
 
-import { useDerivedPositionInfo } from 'hooks/v3/useDerivedPositionInfo'
-import { useV3PositionFromTokenId, useV3TokenIdsByAccount } from 'hooks/v3/useV3Positions'
-import useV3DerivedInfo from 'hooks/v3/useV3DerivedInfo'
+import { useIsExpertMode, useUserSlippage } from '@pancakeswap/utils/user'
 import { FeeAmount, MasterChefV3, NonfungiblePositionManager } from '@pancakeswap/v3-sdk'
+import { useTransactionDeadline } from 'hooks/useTransactionDeadline'
+import { useDerivedPositionInfo } from 'hooks/v3/useDerivedPositionInfo'
+import useV3DerivedInfo from 'hooks/v3/useV3DerivedInfo'
+import { useV3PositionFromTokenId, useV3TokenIdsByAccount } from 'hooks/v3/useV3Positions'
 import { useCallback, useMemo, useState } from 'react'
-import useTransactionDeadline from 'hooks/useTransactionDeadline'
-import { useUserSlippage, useIsExpertMode } from '@pancakeswap/utils/user'
+import { CurrencyField as Field } from 'utils/types'
 import { maxAmountSpend } from 'utils/maxAmountSpend'
-import { Field } from 'state/mint/actions'
 
-import { useTransactionAdder } from 'state/transactions/hooks'
-import { useMasterchefV3, useV3NFTPositionManagerContract } from 'hooks/useContract'
-import { calculateGasMargin } from 'utils'
-import { useRouter } from 'next/router'
+import { useTranslation } from '@pancakeswap/localization'
+import { AppHeader } from 'components/App'
 import { useIsTransactionUnsupported, useIsTransactionWarning } from 'hooks/Trades'
 import useActiveWeb3React from 'hooks/useActiveWeb3React'
-import { useTranslation } from '@pancakeswap/localization'
-import { useSendTransaction } from 'wagmi'
+import { useMasterchefV3, useV3NFTPositionManagerContract } from 'hooks/useContract'
+import { useRouter } from 'next/router'
+import { useTransactionAdder } from 'state/transactions/hooks'
+import { calculateGasMargin } from 'utils'
 import Page from 'views/Page'
-import { AppHeader } from 'components/App'
+import { useSendTransaction } from 'wagmi'
 
 import { BodyWrapper } from 'components/App/AppBody'
 import CurrencyInputPanel from 'components/CurrencyInputPanel'
 import TransactionConfirmationModal from 'components/TransactionConfirmationModal'
 import { ApprovalState, useApproveCallback } from 'hooks/useApproveCallback'
-import { formatRawAmount, formatCurrencyAmount } from 'utils/formatCurrencyAmount'
 import { basisPointsToPercent } from 'utils/exchange'
-import { hexToBigInt } from 'viem'
+import { formatCurrencyAmount, formatRawAmount } from 'utils/formatCurrencyAmount'
 import { isUserRejected } from 'utils/sentry'
 import { getViemClients } from 'utils/viem'
+import { hexToBigInt } from 'viem'
 
-import { useV3MintActionHandlers } from './formViews/V3FormView/form/hooks/useV3MintActionHandlers'
-import { PositionPreview } from './formViews/V3FormView/components/PositionPreview'
-import LockedDeposit from './formViews/V3FormView/components/LockedDeposit'
+import { transactionErrorToUserReadableMessage } from 'utils/transactionErrorToUserReadableMessage'
 import { V3SubmitButton } from './components/V3SubmitButton'
+import LockedDeposit from './formViews/V3FormView/components/LockedDeposit'
+import { PositionPreview } from './formViews/V3FormView/components/PositionPreview'
+import { useV3MintActionHandlers } from './formViews/V3FormView/form/hooks/useV3MintActionHandlers'
 import { useV3FormState } from './formViews/V3FormView/form/reducer'
 
 interface AddLiquidityV3PropsType {
-  currencyA: Currency
-  currencyB: Currency
+  currencyA?: Currency | null
+  currencyB?: Currency | null
 }
 
 export default function IncreaseLiquidityV3({ currencyA: baseCurrency, currencyB }: AddLiquidityV3PropsType) {
   const router = useRouter()
   const { sendTransactionAsync } = useSendTransaction()
   const [attemptingTxn, setAttemptingTxn] = useState<boolean>(false) // clicked confirm
+  const [txnErrorMessage, setTxnErrorMessage] = useState<string | undefined>()
 
   const [, , feeAmountFromUrl, tokenId] = router.query.currency || []
 
@@ -121,7 +123,7 @@ export default function IncreaseLiquidityV3({ currencyA: baseCurrency, currencyB
   const isValid = !errorMessage && !invalidRange
 
   // txn values
-  const deadline = useTransactionDeadline() // custom from users settings
+  const [deadline] = useTransactionDeadline() // custom from users settings
   // get formatted amounts
   const formattedAmounts = useMemo(
     () => ({
@@ -198,7 +200,7 @@ export default function IncreaseLiquidityV3({ currencyA: baseCurrency, currencyB
 
       setAttemptingTxn(true)
       getViemClients({ chainId })
-        .estimateGas({
+        ?.estimateGas({
           account,
           to: manager.address,
           data: calldata,
@@ -227,19 +229,22 @@ export default function IncreaseLiquidityV3({ currencyA: baseCurrency, currencyB
           )
 
           setAttemptingTxn(false)
-          addTransaction(response, {
-            type: 'increase-liquidity-v3',
-            summary: `Increase ${baseAmount} ${baseCurrency?.symbol} and ${quoteAmount} ${quoteCurrency?.symbol}`,
-          })
-          setTxHash(response.hash)
+          addTransaction(
+            { hash: response },
+            {
+              type: 'increase-liquidity-v3',
+              summary: `Increase ${baseAmount} ${baseCurrency?.symbol} and ${quoteAmount} ${quoteCurrency?.symbol}`,
+            },
+          )
+          setTxHash(response)
         })
-        .catch((error) => {
-          console.error('Failed to send transaction', error)
-          setAttemptingTxn(false)
+        .catch((err) => {
           // we only care if the error is something _other_ than the user rejected the tx
-          if (!isUserRejected(error)) {
-            console.error(error)
+          if (!isUserRejected(err)) {
+            setTxnErrorMessage(transactionErrorToUserReadableMessage(err, t))
           }
+          setAttemptingTxn(false)
+          console.error(err)
         })
     }
   }, [
@@ -260,6 +265,7 @@ export default function IncreaseLiquidityV3({ currencyA: baseCurrency, currencyB
     sendTransactionAsync,
     tokenId,
     tokenIdsInMCv3Loading,
+    t,
   ])
 
   const addIsUnsupported = useIsTransactionUnsupported(currencies?.CURRENCY_A, currencies?.CURRENCY_B)
@@ -272,24 +278,41 @@ export default function IncreaseLiquidityV3({ currencyA: baseCurrency, currencyB
       onFieldAInput('')
       router.push(`/liquidity/${tokenId}`)
     }
+    setTxnErrorMessage(undefined)
   }, [onFieldAInput, router, txHash, tokenId])
 
-  const pendingText = useMemo(
-    () =>
-      `Supplying ${!depositADisabled ? formatCurrencyAmount(parsedAmounts[Field.CURRENCY_A], 4, locale) : ''} ${
-        !depositADisabled ? currencies[Field.CURRENCY_A]?.symbol : ''
-      } ${!outOfRange ? 'and' : ''} ${
-        !depositBDisabled ? formatCurrencyAmount(parsedAmounts[Field.CURRENCY_B], 4, locale) : ''
-      } ${!depositBDisabled ? currencies[Field.CURRENCY_B]?.symbol : ''}`,
-    [depositADisabled, depositBDisabled, currencies, parsedAmounts, outOfRange, locale],
-  )
+  const pendingText = useMemo(() => {
+    if (depositADisabled) {
+      return t('Supplying %amountA% %symbolA% %amountB% %symbolB%', {
+        amountA: formatCurrencyAmount(parsedAmounts[Field.CURRENCY_B], 4, locale),
+        symbolA: currencies[Field.CURRENCY_B]?.symbol,
+        amountB: '',
+        symbolB: '',
+      })
+    }
+    if (depositBDisabled) {
+      return t('Supplying %amountA% %symbolA% %amountB% %symbolB%', {
+        amountA: formatCurrencyAmount(parsedAmounts[Field.CURRENCY_A], 4, locale),
+        symbolA: currencies[Field.CURRENCY_A]?.symbol,
+        amountB: '',
+        symbolB: '',
+      })
+    }
+    return t('Supplying %amountA% %symbolA% and %amountB% %symbolB%', {
+      amountA: formatCurrencyAmount(parsedAmounts[Field.CURRENCY_A], 4, locale),
+      symbolA: currencies[Field.CURRENCY_A]?.symbol ?? '',
+      amountB: formatCurrencyAmount(parsedAmounts[Field.CURRENCY_B], 4, locale),
+      symbolB: currencies[Field.CURRENCY_B]?.symbol ?? '',
+    })
+  }, [depositADisabled, depositBDisabled, currencies, parsedAmounts, locale, t])
 
   const [onPresentIncreaseLiquidityModal] = useModal(
     <TransactionConfirmationModal
       minWidth={['100%', null, '420px']}
-      title="Increase Liquidity"
+      title={t('Increase Liquidity')}
       customOnDismiss={handleDismissConfirmation}
       attemptingTxn={attemptingTxn}
+      errorMessage={txnErrorMessage}
       hash={txHash}
       content={() => (
         <ConfirmationModalContent

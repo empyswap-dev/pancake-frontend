@@ -1,7 +1,8 @@
 /* eslint-disable react/no-array-index-key */
-import React, { useContext, useEffect, useState, useCallback } from "react";
-import { usePopper } from "react-popper";
 import debounce from "lodash/debounce";
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { usePopper } from "react-popper";
+import useMatchBreakpoints from "../../contexts/MatchBreakpoints/useMatchBreakpoints";
 import { useOnClickOutside } from "../../hooks";
 import { MenuContext } from "../../widgets/Menu/context";
 import { Box, Flex } from "../Box";
@@ -9,8 +10,8 @@ import { LogoutIcon } from "../Svg";
 import {
   DropdownMenuDivider,
   DropdownMenuItem,
-  StyledDropdownMenu,
   LinkStatus,
+  StyledDropdownMenu,
   StyledDropdownMenuItemContainer,
 } from "./styles";
 import { DropdownMenuItemType, DropdownMenuProps } from "./types";
@@ -28,6 +29,7 @@ const DropdownMenu: React.FC<React.PropsWithChildren<DropdownMenuProps>> = ({
 }) => {
   const { linkComponent } = useContext(MenuContext);
   const [isOpen, setIsOpen] = useState(false);
+  const { isMobile, isMd } = useMatchBreakpoints();
   const [targetRef, setTargetRef] = useState<HTMLDivElement | null>(null);
   const [tooltipRef, setTooltipRef] = useState<HTMLDivElement | null>(null);
   const hasItems = items.length > 0;
@@ -98,21 +100,21 @@ const DropdownMenu: React.FC<React.PropsWithChildren<DropdownMenuProps>> = ({
           $isOpen={isMenuShow}
         >
           {items
-            .filter((item) => !item.isMobileOnly)
+            .filter((item) => ((isMobile || isMd) && item.isMobileOnly) || !item.isMobileOnly)
             .map(
               (
                 { type = DropdownMenuItemType.INTERNAL_LINK, label, href = "/", status, disabled, ...itemProps },
                 itemItem
               ) => {
                 const MenuItemContent = (
-                  <>
+                  <Flex alignItems="center">
                     {label}
                     {status && (
                       <LinkStatus textTransform="uppercase" color={status.color} fontSize="14px">
                         {status.text}
                       </LinkStatus>
                     )}
-                  </>
+                  </Flex>
                 );
                 const isActive = href === activeItem;
                 return (
@@ -133,10 +135,11 @@ const DropdownMenu: React.FC<React.PropsWithChildren<DropdownMenuProps>> = ({
                         disabled={disabled || isDisabled}
                         as={linkComponent}
                         href={href}
-                        onClick={() => {
-                          setIsOpen(false);
-                        }}
                         {...itemProps}
+                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                          setIsOpen(false);
+                          itemProps.onClick?.(e);
+                        }}
                       >
                         {MenuItemContent}
                       </DropdownMenuItem>
@@ -148,13 +151,14 @@ const DropdownMenu: React.FC<React.PropsWithChildren<DropdownMenuProps>> = ({
                         as="a"
                         href={href}
                         target="_blank"
-                        onClick={() => {
-                          setIsOpen(false);
-                        }}
                         {...itemProps}
+                        onClick={(e: any) => {
+                          setIsOpen(false);
+                          itemProps.onClick?.(e);
+                        }}
                       >
                         <Flex alignItems="center" justifyContent="space-between" width="100%">
-                          {label}
+                          {MenuItemContent}
                           <LogoutIcon color={disabled ? "textDisabled" : "textSubtle"} />
                         </Flex>
                       </DropdownMenuItem>

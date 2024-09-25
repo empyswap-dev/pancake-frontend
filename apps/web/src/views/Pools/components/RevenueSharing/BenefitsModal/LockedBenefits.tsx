@@ -1,14 +1,16 @@
-import { useMemo } from 'react'
 import { useTranslation } from '@pancakeswap/localization'
-import { Box, Flex, Text, Card, ICakeIcon, BCakeIcon, VCakeIcon, NextLinkFromReactRouter } from '@pancakeswap/uikit'
-import Image from 'next/image'
+import { BCakeIcon, Box, Card, Flex, ICakeIcon, Text, VCakeIcon } from '@pancakeswap/uikit'
+import { NextLinkFromReactRouter } from '@pancakeswap/widgets-internal'
+import { useMemo } from 'react'
+
 import BigNumber from 'bignumber.js'
-import BenefitsText from 'views/Pools/components/RevenueSharing/BenefitsModal/BenefitsText'
 import useCakeBenefits from 'components/Menu/UserMenu/hooks/useCakeBenefits'
 import { useVaultApy } from 'hooks/useVaultApy'
-import { VaultKey, DeserializedLockedCakeVault } from 'state/types'
+import Image from 'next/image'
 import { useVaultPoolByKey } from 'state/pools/hooks'
+import { DeserializedLockedCakeVault, VaultKey } from 'state/types'
 import useUserDataInVaultPresenter from 'views/Pools/components/LockedPool/hooks/useUserDataInVaultPresenter'
+import BenefitsText from 'views/Pools/components/RevenueSharing/BenefitsModal/BenefitsText'
 
 const LockedBenefits = () => {
   const { t } = useTranslation()
@@ -22,7 +24,7 @@ const LockedBenefits = () => {
 
   const lockedApy = useMemo(() => getLockedApy(secondDuration), [getLockedApy, secondDuration])
   const boostFactor = useMemo(() => getBoostFactor(secondDuration), [getBoostFactor, secondDuration])
-  const delApy = useMemo(() => new BigNumber(lockedApy).div(boostFactor).toNumber(), [lockedApy, boostFactor])
+  const delApy = useMemo(() => new BigNumber(lockedApy || 0).div(boostFactor).toNumber(), [lockedApy, boostFactor])
 
   const iCakeTooltipComponent = () => (
     <>
@@ -42,7 +44,7 @@ const LockedBenefits = () => {
   const bCakeTooltipComponent = () => (
     <>
       <Text>{t('bCAKE allows you to boost your yield in PancakeSwap Farms by up to 2x.')}</Text>
-      <NextLinkFromReactRouter to="/farms">
+      <NextLinkFromReactRouter to="/liquidity/pools">
         <Text bold color="primary">
           {t('Learn More')}
         </Text>
@@ -87,7 +89,7 @@ const LockedBenefits = () => {
             </Flex>
             <BenefitsText
               title="iCAKE"
-              value={cakeBenefits?.iCake}
+              value={cakeBenefits?.iCake || ''}
               tooltipComponent={iCakeTooltipComponent()}
               icon={<ICakeIcon width={24} height={24} mr="8px" />}
             />
@@ -99,7 +101,7 @@ const LockedBenefits = () => {
             />
             <BenefitsText
               title="vCAKE"
-              value={cakeBenefits?.vCake?.vaultScore}
+              value={cakeBenefits?.vCake?.vaultScore || ''}
               tooltipComponent={vCakeTooltipComponent()}
               icon={<VCakeIcon width={24} height={24} mr="8px" />}
             />

@@ -1,20 +1,36 @@
 import { useTranslation } from '@pancakeswap/localization'
-import { SmartRouterTrade, SmartRouter } from '@pancakeswap/smart-router/evm'
 import { Currency, CurrencyAmount, Percent, TradeType } from '@pancakeswap/sdk'
-import { BackForwardIcon, Button, QuestionHelper, Text, Link, AutoColumn, Dots, Flex } from '@pancakeswap/uikit'
+import { SmartRouter, SmartRouterTrade } from '@pancakeswap/smart-router'
+import {
+  AutoColumn,
+  BackForwardIcon,
+  Box,
+  Button,
+  Dots,
+  Flex,
+  Link,
+  QuestionHelper,
+  Text,
+  WarningIcon,
+  useTooltip,
+} from '@pancakeswap/uikit'
 import { formatAmount } from '@pancakeswap/utils/formatFractions'
+import { CurrencyLogo as CurrencyLogoWidget } from '@pancakeswap/widgets-internal'
 import { AutoRow, RowBetween, RowFixed } from 'components/Layout/Row'
-import { useState, memo, useMemo } from 'react'
+import { CurrencyLogo } from 'components/Logo'
+import { BUYBACK_FEE, LP_HOLDERS_FEE, TOTAL_FEE, TREASURY_FEE } from 'config/constants/info'
+import { useGasToken } from 'hooks/useGasToken'
+import { memo, useMemo, useState } from 'react'
 import { Field } from 'state/swap/actions'
 import { styled } from 'styled-components'
-import { CurrencyLogo } from 'components/Logo'
 import { warningSeverity } from 'utils/exchange'
-import { BUYBACK_FEE, LP_HOLDERS_FEE, TOTAL_FEE, TREASURY_FEE } from 'config/constants/info'
 import { formatExecutionPrice as mmFormatExecutionPrice } from 'views/Swap/MMLinkPools/utils/exchange'
 
+import { paymasterInfo } from 'config/paymaster'
+import { usePaymaster } from 'hooks/usePaymaster'
 import FormattedPriceImpact from '../../components/FormattedPriceImpact'
 import { StyledBalanceMaxMini, SwapCallbackError } from '../../components/styleds'
-import { formatExecutionPrice } from '../utils/exchange'
+import { SlippageAdjustedAmounts, formatExecutionPrice } from '../utils/exchange'
 
 const SwapModalFooterContainer = styled(AutoColumn)`
   margin-top: 24px;
@@ -22,6 +38,29 @@ const SwapModalFooterContainer = styled(AutoColumn)`
   border-radius: ${({ theme }) => theme.radii.default};
   border: 1px solid ${({ theme }) => theme.colors.cardBorder};
   background-color: ${({ theme }) => theme.colors.background};
+`
+
+const SameTokenWarningBox = styled(Box)`
+  font-size: 13px;
+  background-color: #ffb2371a;
+  padding: 10px;
+  margin-top: 12px;
+  color: ${({ theme }) => theme.colors.yellow};
+  border: 1px solid ${({ theme }) => theme.colors.yellow};
+  border-radius: ${({ theme }) => theme.radii['12px']};
+`
+
+const StyledWarningIcon = styled(WarningIcon)`
+  fill: ${({ theme }) => theme.colors.yellow};
+`
+
+const Badge = styled.span`
+  font-size: 14px;
+  padding: 1px 6px;
+  user-select: none;
+  border-radius: ${({ theme }) => theme.radii['32px']};
+  color: ${({ theme }) => theme.colors.invertedContrast};
+  background-color: ${({ theme }) => theme.colors.success};
 `
 
 export const SwapModalFooter = memo(function SwapModalFooter({
@@ -40,19 +79,19 @@ export const SwapModalFooter = memo(function SwapModalFooter({
   isRFQReady,
   currencyBalances,
 }: {
-  trade?: SmartRouterTrade<TradeType>
+  trade?: Pick<SmartRouterTrade<TradeType>, 'inputAmount' | 'outputAmount'>
   tradeType: TradeType
   lpFee?: CurrencyAmount<Currency>
   inputAmount: CurrencyAmount<Currency>
   outputAmount: CurrencyAmount<Currency>
   priceImpact?: Percent
-  slippageAdjustedAmounts: { [field in Field]?: CurrencyAmount<Currency> }
+  slippageAdjustedAmounts: SlippageAdjustedAmounts | undefined | null
   isEnoughInputBalance?: boolean
   swapErrorMessage?: string | undefined
   disabledConfirm: boolean
   isMM?: boolean
   isRFQReady?: boolean
-  currencyBalances: {
+  currencyBalances?: {
     INPUT?: CurrencyAmount<Currency>
     OUTPUT?: CurrencyAmount<Currency>
   }
@@ -60,8 +99,31 @@ export const SwapModalFooter = memo(function SwapModalFooter({
 }) {
   const { t } = useTranslation()
   const [showInverted, setShowInverted] = useState<boolean>(false)
-  const severity = warningSeverity(priceImpactWithoutFee)
 
+  const [gasToken] = useGasToken()
+  const { isPaymasterAvailable, isPaymasterTokenActive } = usePaymaster()
+  const gasTokenInfo = paymasterInfo[gasToken.isToken ? gasToken?.wrapped.address : '']
+
+  const showSameTokenWarning = useMemo(
+    () =>
+      isPaymasterAvailable &&
+      isPaymasterTokenActive &&
+      gasTokenInfo?.discount !== 'FREE' &&
+      inputAmount.currency?.wrapped.address &&
+      !inputAmount.currency.isNative &&
+      gasToken.isToken &&
+      inputAmount.currency.wrapped.address === gasToken.wrapped.address,
+    [inputAmount, gasToken, isPaymasterAvailable, isPaymasterTokenActive, gasTokenInfo],
+  )
+
+  const { targetRef, tooltip, tooltipVisible } = useTooltip(
+    gasTokenInfo?.discount &&
+      (gasTokenInfo.discount === 'FREE'
+        ? t('Gas fees is fully sponsored')
+        : t('%discount% discount on this gas fee token', { discount: gasTokenInfo.discount })),
+  )
+
+  const severity = warningSeverity(priceImpactWithoutFee)
   const totalFeePercent = `${(TOTAL_FEE * 100).toFixed(2)}%`
   const lpHoldersFeePercent = `${(LP_HOLDERS_FEE * 100).toFixed(2)}%`
   const treasuryFeePercent = `${(TREASURY_FEE * 100).toFixed(4)}%`
@@ -97,7 +159,6 @@ export const SwapModalFooter = memo(function SwapModalFooter({
             </StyledBalanceMaxMini>
           </Text>
         </RowBetween>
-
         <RowBetween mb="8px">
           <RowFixed>
             <Text fontSize="14px">
@@ -114,8 +175,8 @@ export const SwapModalFooter = memo(function SwapModalFooter({
           <RowFixed>
             <Text fontSize="14px">
               {tradeType === TradeType.EXACT_INPUT
-                ? formatAmount(slippageAdjustedAmounts[Field.OUTPUT], 4) ?? '-'
-                : formatAmount(slippageAdjustedAmounts[Field.INPUT], 4) ?? '-'}
+                ? formatAmount(slippageAdjustedAmounts?.[Field.OUTPUT], 4) ?? '-'
+                : formatAmount(slippageAdjustedAmounts?.[Field.INPUT], 4) ?? '-'}
             </Text>
             <Text fontSize="14px" marginLeft="4px">
               {tradeType === TradeType.EXACT_INPUT ? outputAmount.currency.symbol : inputAmount.currency.symbol}
@@ -218,7 +279,7 @@ export const SwapModalFooter = memo(function SwapModalFooter({
               <Text fontSize="14px" mr="8px">
                 {`${formatAmount(realizedLPFee, 6)} ${inputAmount.currency.symbol}`}
               </Text>
-              <CurrencyLogo currency={currencyBalances.INPUT?.currency ?? inputAmount.currency} size="24px" />
+              <CurrencyLogo currency={currencyBalances?.INPUT?.currency ?? inputAmount.currency} size="24px" />
             </Flex>
           ) : (
             <Text fontSize="14px" textAlign="right">
@@ -226,7 +287,52 @@ export const SwapModalFooter = memo(function SwapModalFooter({
             </Text>
           )}
         </RowBetween>
+        {isPaymasterAvailable && isPaymasterTokenActive && (
+          <RowBetween mt="8px">
+            <RowFixed>
+              <Text fontSize="14px">{t('Gas Token')}</Text>
+              {gasTokenInfo && gasTokenInfo.discount && (
+                <Badge
+                  ref={targetRef}
+                  style={{ fontSize: '12px', fontWeight: 600, padding: '3px 5px', marginLeft: '4px' }}
+                >
+                  ⛽️ {gasTokenInfo.discountLabel ?? gasTokenInfo.discount}
+                </Badge>
+              )}
+              {tooltipVisible && tooltip}
+            </RowFixed>
+
+            <Flex alignItems="center">
+              <Text marginRight={2} fontSize={14}>
+                {(gasToken && gasToken.symbol && gasToken.symbol.length > 10
+                  ? `${gasToken.symbol.slice(0, 4)}...${gasToken.symbol.slice(
+                      gasToken.symbol.length - 5,
+                      gasToken.symbol.length,
+                    )}`
+                  : gasToken?.symbol) || 'ETH'}
+              </Text>
+
+              <div style={{ position: 'relative' }}>
+                <CurrencyLogoWidget currency={gasToken} />
+                <p style={{ position: 'absolute', bottom: '-2px', left: '-6px', fontSize: '16px' }}>⛽️</p>
+              </div>
+            </Flex>
+          </RowBetween>
+        )}
       </SwapModalFooterContainer>
+
+      {showSameTokenWarning && (
+        <SameTokenWarningBox>
+          <Flex>
+            <StyledWarningIcon marginRight={2} />
+            <span>
+              {t(
+                'Please ensure you leave enough tokens for gas fees when selecting the same token for gas as the input token',
+              )}
+            </span>
+          </Flex>
+        </SameTokenWarningBox>
+      )}
 
       <AutoRow>
         <Button

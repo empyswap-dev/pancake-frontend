@@ -7,10 +7,20 @@ export interface ExtendEthereum extends WindowProvider {
   isMathWallet?: true
   isTrustWallet?: true
   isBlocto?: true
+  isBinance?: true
+  isCoinbaseWallet?: true
+  isTrust?: true
+  isTokenPocket?: true
+  isMetaMask?: true
+  providers?: ExtendEthereum[]
+  isOpera?: true
+  isBraveWallet?: true
+  isRabby?: true
 }
 
 declare global {
   interface Window {
+    okxwallet?: WindowProvider
     coin98?: true
     mercuryoWidget?: any
     ethereum?: ExtendEthereum
@@ -18,6 +28,12 @@ declare global {
       bnbSign?: (address: string, message: string) => Promise<{ publicKey: string; signature: string }>
       switchNetwork?: (networkId: string) => Promise<string>
     } & Ethereum
+  }
+
+  namespace JSX {
+    interface IntrinsicElements {
+      'usdv-widget': any
+    }
   }
 }
 

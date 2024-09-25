@@ -1,9 +1,9 @@
-import { Address, getAddress } from 'viem'
-import { Currency } from '@pancakeswap/sdk'
 import { ChainId } from '@pancakeswap/chains'
-import { bsc } from 'wagmi/chains'
-import memoize from 'lodash/memoize'
+import { Currency } from '@pancakeswap/sdk'
 import { TokenAddressMap } from '@pancakeswap/token-lists'
+import memoize from 'lodash/memoize'
+import { Address, getAddress } from 'viem'
+import { bsc } from 'wagmi/chains'
 import { chains } from './wagmi'
 
 // returns the checksummed address if the address is valid, otherwise returns undefined
@@ -20,28 +20,28 @@ export const safeGetAddress = memoize((value: any): Address | undefined => {
 })
 
 export function getBlockExploreLink(
-  data: string | number,
+  data: string | number | undefined | null,
   type: 'transaction' | 'token' | 'address' | 'block' | 'countdown',
   chainIdOverride?: number,
 ): string {
   const chainId = chainIdOverride || ChainId.BSC
   const chain = chains.find((c) => c.id === chainId)
-  if (!chain) return bsc.blockExplorers.default.url
+  if (!chain || !data) return bsc.blockExplorers.default.url
   switch (type) {
     case 'transaction': {
-      return `${chain.blockExplorers.default.url}/tx/${data}`
+      return `${chain?.blockExplorers?.default.url}/tx/${data}`
     }
     case 'token': {
-      return `${chain.blockExplorers.default.url}/token/${data}`
+      return `${chain?.blockExplorers?.default.url}/token/${data}`
     }
     case 'block': {
-      return `${chain.blockExplorers.default.url}/block/${data}`
+      return `${chain?.blockExplorers?.default.url}/block/${data}`
     }
     case 'countdown': {
-      return `${chain.blockExplorers.default.url}/block/countdown/${data}`
+      return `${chain?.blockExplorers?.default.url}/block/countdown/${data}`
     }
     default: {
-      return `${chain.blockExplorers.default.url}/address/${data}`
+      return `${chain?.blockExplorers?.default.url}/address/${data}`
     }
   }
 }
@@ -53,7 +53,8 @@ export function getBlockExploreName(chainIdOverride?: number) {
   return chain?.blockExplorers?.default.name || bsc.blockExplorers.default.name
 }
 
-export function getBscScanLinkForNft(collectionAddress: string, tokenId: string): string {
+export function getBscScanLinkForNft(collectionAddress: string | undefined, tokenId?: string): string {
+  if (!collectionAddress) return ''
   return `${bsc.blockExplorers.default.url}/token/${collectionAddress}?a=${tokenId}`
 }
 

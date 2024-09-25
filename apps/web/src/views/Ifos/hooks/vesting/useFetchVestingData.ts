@@ -1,18 +1,28 @@
-import useSWR from 'swr'
+import { useMemo } from 'react'
 import { useAccount } from 'wagmi'
-import { Ifo, PoolIds } from 'config/constants/types'
-import { ifosConfig, FAST_INTERVAL } from 'config/constants'
+import { Ifo, PoolIds } from '@pancakeswap/ifos'
 import BigNumber from 'bignumber.js'
-import { fetchUserWalletIfoData } from './fetchUserWalletIfoData'
+import { useQuery } from '@tanstack/react-query'
 
-const allVestingIfo: Ifo[] = ifosConfig.filter((ifo) => ifo.version >= 3.2 && ifo.vestingTitle)
+import { useIfoConfigsAcrossChains } from 'hooks/useIfoConfig'
+import { FAST_INTERVAL } from 'config/constants'
+import { useActiveChainId } from 'hooks/useActiveChainId'
+
+import { fetchUserWalletIfoData } from './fetchUserWalletIfoData'
 
 const useFetchVestingData = () => {
   const { address: account } = useAccount()
+  const { chainId } = useActiveChainId()
+  const configs = useIfoConfigsAcrossChains()
+  const allVestingIfo = useMemo<Ifo[]>(
+    () => configs?.filter((ifo) => ifo.version >= 3.2 && ifo.vestingTitle) || [],
+    [configs],
+  )
 
-  const { data, mutate } = useSWR(
-    account ? ['vestingData'] : null,
-    async () => {
+  const { data: vestingData, refetch } = useQuery({
+    queryKey: ['vestingData', account],
+
+    queryFn: async () => {
       const allData = await Promise.all(
         allVestingIfo.map(async (ifo) => {
           const response = await fetchUserWalletIfoData(ifo, account)
@@ -53,16 +63,32 @@ const useFetchVestingData = () => {
         },
       )
     },
-    {
-      revalidateOnFocus: false,
-      refreshInterval: FAST_INTERVAL,
-      dedupingInterval: FAST_INTERVAL,
-    },
+
+    enabled: Boolean(account),
+    refetchOnWindowFocus: false,
+    refetchInterval: FAST_INTERVAL,
+    staleTime: FAST_INTERVAL,
+  })
+
+  // Sort by active chain
+  const data = useMemo(
+    () =>
+      vestingData &&
+      vestingData.toSorted((a, b) => {
+        if (a.ifo.chainId === chainId && b.ifo.chainId !== chainId) {
+          return -1
+        }
+        if (a.ifo.chainId !== chainId && b.ifo.chainId === chainId) {
+          return 1
+        }
+        return 0
+      }),
+    [chainId, vestingData],
   )
 
   return {
     data: data || [],
-    fetchUserVestingData: mutate,
+    fetchUserVestingData: refetch,
   }
 }
 

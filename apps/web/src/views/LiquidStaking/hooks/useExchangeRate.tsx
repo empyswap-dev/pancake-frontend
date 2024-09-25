@@ -1,13 +1,13 @@
-import useSWR from 'swr'
-import { useActiveChainId } from 'hooks/useActiveChainId'
-import BigNumber from 'bignumber.js'
 import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
+import { getBalanceAmount } from '@pancakeswap/utils/formatBalance'
+import { useQuery } from '@tanstack/react-query'
+import BigNumber from 'bignumber.js'
+import { useActiveChainId } from 'hooks/useActiveChainId'
 import { publicClient } from 'utils/wagmi'
 import { useLiquidStakingList } from 'views/LiquidStaking/hooks/useLiquidStakingList'
-import { getBalanceAmount } from '@pancakeswap/utils/formatBalance'
 
 interface UseExchangeRateProps {
-  decimals: number
+  decimals?: number
 }
 
 interface UseExchangeRateDetail {
@@ -26,9 +26,10 @@ export const useExchangeRate = ({ decimals }: UseExchangeRateProps): UseExchange
   const { chainId } = useActiveChainId()
   const { data: liquidStakingList } = useLiquidStakingList()
 
-  const { data, isLoading, mutate } = useSWR(
-    liquidStakingList?.length && decimals && ['/user-exchange-rate', chainId, liquidStakingList, decimals],
-    async () => {
+  const { data, isPending, refetch } = useQuery({
+    queryKey: ['liquidStaking', 'user-exchange-rate', chainId, decimals],
+
+    queryFn: async () => {
       try {
         const client = publicClient({ chainId })
 
@@ -63,11 +64,13 @@ export const useExchangeRate = ({ decimals }: UseExchangeRateProps): UseExchange
         return []
       }
     },
-  )
+
+    enabled: Boolean(liquidStakingList?.length && decimals),
+  })
 
   return {
-    isFetching: isLoading,
+    isFetching: isPending,
     exchangeRateList: data ?? [],
-    refresh: mutate,
+    refresh: refetch,
   }
 }

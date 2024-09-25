@@ -1,26 +1,29 @@
-import { Token, WNATIVE } from '@pancakeswap/sdk'
 import { ChainId } from '@pancakeswap/chains'
+import { ERC20Token, Token, WNATIVE } from '@pancakeswap/sdk'
 import {
-  bscTokens,
-  bscTestnetTokens,
   BUSD,
   USDC,
   USDT,
   WBTC_ETH,
-  arbitrumTokens,
+  arbSepoliaTokens,
   arbitrumGoerliTokens,
-  ethereumTokens,
-  polygonZkEvmTokens,
-  polygonZkEvmTestnetTokens,
-  zksyncTokens,
-  zkSyncTestnetTokens,
-  lineaTestnetTokens,
-  baseTokens,
+  arbitrumTokens,
+  baseSepoliaTokens,
   baseTestnetTokens,
-  opBnbTokens,
-  opBnbTestnetTokens,
-  scrollSepoliaTokens,
+  baseTokens,
+  bscTestnetTokens,
+  bscTokens,
+  ethereumTokens,
+  lineaTestnetTokens,
   lineaTokens,
+  opBnbTestnetTokens,
+  opBnbTokens,
+  polygonZkEvmTestnetTokens,
+  polygonZkEvmTokens,
+  scrollSepoliaTokens,
+  sepoliaTokens,
+  zkSyncTestnetTokens,
+  zksyncTokens,
 } from '@pancakeswap/tokens'
 
 import { ChainMap, ChainTokenList } from '../types'
@@ -43,6 +46,9 @@ export const SMART_ROUTER_ADDRESSES = {
   [ChainId.BASE]: '0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86',
   [ChainId.BASE_TESTNET]: '0xDDC44b8507B4Ca992fB60F0ECdF5651A87668509',
   [ChainId.SCROLL_SEPOLIA]: '0xDDC44b8507B4Ca992fB60F0ECdF5651A87668509',
+  [ChainId.SEPOLIA]: '0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86',
+  [ChainId.ARBITRUM_SEPOLIA]: '0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86',
+  [ChainId.BASE_SEPOLIA]: '0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86',
 } as const satisfies Record<ChainId, string>
 
 export const V2_ROUTER_ADDRESS: ChainMap<string> = {
@@ -63,6 +69,9 @@ export const V2_ROUTER_ADDRESS: ChainMap<string> = {
   [ChainId.BASE]: '0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb',
   [ChainId.BASE_TESTNET]: '0xC259d1D3476558630d83b0b60c105ae958382792',
   [ChainId.SCROLL_SEPOLIA]: '0x715303D2eF7dA7FFAbF637651D71FD11d41fAf7F',
+  [ChainId.SEPOLIA]: '0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb',
+  [ChainId.ARBITRUM_SEPOLIA]: '0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb',
+  [ChainId.BASE_SEPOLIA]: '0x8cFe327CEc66d1C090Dd72bd0FF11d690C33a2Eb',
 }
 
 export const STABLE_SWAP_INFO_ADDRESS: ChainMap<string> = {
@@ -83,6 +92,9 @@ export const STABLE_SWAP_INFO_ADDRESS: ChainMap<string> = {
   [ChainId.BASE]: '',
   [ChainId.BASE_TESTNET]: '',
   [ChainId.SCROLL_SEPOLIA]: '',
+  [ChainId.SEPOLIA]: '',
+  [ChainId.ARBITRUM_SEPOLIA]: '',
+  [ChainId.BASE_SEPOLIA]: '',
 }
 
 // used to construct intermediary pairs for trading
@@ -101,7 +113,7 @@ export const BASES_TO_CHECK_TRADES_AGAINST: ChainTokenList = {
   [ChainId.BSC_TESTNET]: [bscTestnetTokens.wbnb, bscTestnetTokens.cake, bscTestnetTokens.busd],
   [ChainId.ARBITRUM_ONE]: [arbitrumTokens.weth, arbitrumTokens.usdt, arbitrumTokens.usdc],
   [ChainId.ARBITRUM_GOERLI]: [arbitrumGoerliTokens.weth, arbitrumGoerliTokens.usdc],
-  [ChainId.POLYGON_ZKEVM]: [polygonZkEvmTokens.weth, polygonZkEvmTokens.usdt],
+  [ChainId.POLYGON_ZKEVM]: [polygonZkEvmTokens.weth, polygonZkEvmTokens.usdt, polygonZkEvmTokens.usdc],
   [ChainId.POLYGON_ZKEVM_TESTNET]: [polygonZkEvmTestnetTokens.weth, polygonZkEvmTestnetTokens.usdt],
   [ChainId.ZKSYNC]: [zksyncTokens.usdc, zksyncTokens.weth],
   [ChainId.ZKSYNC_TESTNET]: [zkSyncTestnetTokens.usdc, zkSyncTestnetTokens.weth],
@@ -112,7 +124,12 @@ export const BASES_TO_CHECK_TRADES_AGAINST: ChainTokenList = {
   [ChainId.BASE]: [baseTokens.usdc, baseTokens.weth],
   [ChainId.BASE_TESTNET]: [baseTestnetTokens.usdc, baseTestnetTokens.weth],
   [ChainId.SCROLL_SEPOLIA]: [scrollSepoliaTokens.usdc, scrollSepoliaTokens.weth],
+  [ChainId.SEPOLIA]: [sepoliaTokens.usdc, sepoliaTokens.weth],
+  [ChainId.ARBITRUM_SEPOLIA]: [arbSepoliaTokens.usdc, arbSepoliaTokens.weth],
+  [ChainId.BASE_SEPOLIA]: [baseSepoliaTokens.usdc, baseSepoliaTokens.weth],
 }
+
+const czusd = new ERC20Token(ChainId.BSC, '0xE68b79e51bf826534Ff37AA9CeE71a3842ee9c70', 18, 'CZUSD', 'CZUSD')
 
 /**
  * Additional bases for specific tokens
@@ -138,6 +155,20 @@ export const ADDITIONAL_BASES: {
 
     [bscTokens.tusd.address]: [bscTokens.usdd],
     [bscTokens.usdd.address]: [bscTokens.tusd],
+
+    [bscTokens.mpendle.address]: [bscTokens.pendle],
+    [bscTokens.pendle.address]: [bscTokens.mpendle],
+
+    [bscTokens.mdlp.address]: [bscTokens.dlp],
+    [bscTokens.dlp.address]: [bscTokens.mdlp],
+
+    // pancakeswap/pancake-frontend#7909
+    // LSDT
+    '0xAa83Bb1Be2a74AaA8795a8887054919A0Ea96BFA': [czusd],
+    // GEM
+    '0x701F1ed50Aa5e784B8Fb89d1Ba05cCCd627839a7': [czusd],
+    // DOGD
+    '0x99F4cc2BAE97F82A823CA80DcAe52EF972B7F270': [czusd],
   },
   [ChainId.ETHEREUM]: {
     // alETH - ALCX
@@ -146,6 +177,15 @@ export const ADDITIONAL_BASES: {
 
     // rETH - ETH
     [ethereumTokens.weth.address]: [ethereumTokens.rETH],
+  },
+  [ChainId.BASE]: {
+    // axlusdc - USDbC
+    [baseTokens.axlusdc.address]: [baseTokens.usdbc],
+    [baseTokens.usdbc.address]: [baseTokens.axlusdc],
+  },
+  [ChainId.ARBITRUM_ONE]: {
+    [arbitrumTokens.mpendle.address]: [arbitrumTokens.pendle],
+    [arbitrumTokens.pendle.address]: [arbitrumTokens.mpendle],
   },
 }
 

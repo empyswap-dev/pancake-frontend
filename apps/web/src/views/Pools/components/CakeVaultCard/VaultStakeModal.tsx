@@ -1,50 +1,50 @@
-import { useState, useCallback, useMemo } from 'react'
-import { styled } from 'styled-components'
 import {
-  Modal,
-  Text,
-  Flex,
-  Image,
-  Button,
-  Slider,
-  BalanceInput,
   AutoRenewIcon,
+  BalanceInput,
+  Button,
   CalculateIcon,
+  Flex,
   IconButton,
+  Image,
+  Modal,
   Skeleton,
-  Box,
+  Slider,
+  Text,
   useToast,
 } from '@pancakeswap/uikit'
+import { BIG_ZERO } from '@pancakeswap/utils/bigNumber'
 import { Pool } from '@pancakeswap/widgets-internal'
+import { useCallback, useMemo, useState } from 'react'
+import { styled } from 'styled-components'
 
-import { useAccount } from 'wagmi'
 import { useTranslation } from '@pancakeswap/localization'
 import { useAppDispatch } from 'state'
+import { useAccount } from 'wagmi'
 
-import { useCakePrice } from 'hooks/useCakePrice'
-import { useVaultPoolByKey } from 'state/pools/hooks'
-import { useVaultApy } from 'hooks/useVaultApy'
-import { useCheckVaultApprovalStatus, useVaultApprove } from 'views/Pools/hooks/useApprove'
-import { useVaultPoolContract } from 'hooks/useContract'
-import useTheme from 'hooks/useTheme'
-import useWithdrawalFeeTimer from 'views/Pools/hooks/useWithdrawalFeeTimer'
-import BigNumber from 'bignumber.js'
-import { getFullDisplayBalance, formatNumber, getDecimalAmount } from '@pancakeswap/utils/formatBalance'
-import useCatchTxError from 'hooks/useCatchTxError'
-import { fetchCakeVaultUserData } from 'state/pools'
-import { VaultKey } from 'state/types'
+import { Token } from '@pancakeswap/sdk'
 import { getInterestBreakdown } from '@pancakeswap/utils/compoundApyHelpers'
+import { formatNumber, getDecimalAmount, getFullDisplayBalance } from '@pancakeswap/utils/formatBalance'
+import { getFullDecimalMultiplier } from '@pancakeswap/utils/getFullDecimalMultiplier'
+import BigNumber from 'bignumber.js'
 import { ToastDescriptionWithTx } from 'components/Toast'
 import { vaultPoolConfig } from 'config/constants/pools'
-import { getFullDecimalMultiplier } from '@pancakeswap/utils/getFullDecimalMultiplier'
-import { Token } from '@pancakeswap/sdk'
 import { useActiveChainId } from 'hooks/useActiveChainId'
+import { useCakePrice } from 'hooks/useCakePrice'
 import { useCallWithGasPrice } from 'hooks/useCallWithGasPrice'
+import useCatchTxError from 'hooks/useCatchTxError'
+import { useVaultPoolContract } from 'hooks/useContract'
+import useTheme from 'hooks/useTheme'
+import { useVaultApy } from 'hooks/useVaultApy'
+import { fetchCakeVaultUserData } from 'state/pools'
+import { useVaultPoolByKey } from 'state/pools/hooks'
+import { VaultKey } from 'state/types'
+import { useCheckVaultApprovalStatus, useVaultApprove } from 'views/Pools/hooks/useApprove'
+import useWithdrawalFeeTimer from 'views/Pools/hooks/useWithdrawalFeeTimer'
 
-import { VaultRoiCalculatorModal } from '../Vault/VaultRoiCalculatorModal'
-import ConvertToLock from '../LockedPool/Common/ConvertToLock'
-import FeeSummary from './FeeSummary'
+import { logGTMClickStakePoolEvent, logGTMClickUnstakePoolEvent } from 'utils/customGTMEventTracking'
 import { MIN_LOCK_AMOUNT, convertCakeToShares } from '../../helpers'
+import { VaultRoiCalculatorModal } from '../Vault/VaultRoiCalculatorModal'
+import FeeSummary from './FeeSummary'
 
 interface VaultStakeModalProps {
   pool: Pool.DeserializedPool<Token>
@@ -79,19 +79,15 @@ const VaultStakeModal: React.FC<React.PropsWithChildren<VaultStakeModalProps>> =
 }) => {
   const dispatch = useAppDispatch()
   const { chainId } = useActiveChainId()
-  const { stakingToken, stakingTokenPrice, earningTokenPrice, vaultKey } = pool
+  const { stakingToken, earningTokenPrice, vaultKey } = pool
   const { address: account } = useAccount()
   const { fetchWithCatchTxError, loading: pendingTx } = useCatchTxError()
   const vaultPoolContract = useVaultPoolContract(pool.vaultKey) as any
   const { callWithGasPrice } = useCallWithGasPrice()
-  const {
-    pricePerFullShare,
-    userData: {
-      lastDepositedTime,
-      userShares,
-      balance: { cakeAsBigNumber, cakeAsNumberBalance },
-    },
-  } = useVaultPoolByKey(pool.vaultKey)
+  const { pricePerFullShare, userData } = useVaultPoolByKey(pool.vaultKey)
+  const lastDepositedTime = userData?.lastDepositedTime
+  const userShares = userData?.userShares
+  const cakeAsBigNumber = userData?.balance.cakeAsBigNumber
 
   const { t } = useTranslation()
   const { theme } = useTheme()
@@ -99,7 +95,7 @@ const VaultStakeModal: React.FC<React.PropsWithChildren<VaultStakeModalProps>> =
   const [stakeAmount, setStakeAmount] = useState('')
   const [percent, setPercent] = useState(0)
   const [showRoiCalculator, setShowRoiCalculator] = useState(false)
-  const { hasUnstakingFee } = useWithdrawalFeeTimer(parseInt(lastDepositedTime, 10), userShares)
+  const { hasUnstakingFee } = useWithdrawalFeeTimer(parseInt(lastDepositedTime || '0', 10), userShares || BIG_ZERO)
   const cakePriceBusd = useCakePrice()
   const usdValueStaked = new BigNumber(stakeAmount).times(cakePriceBusd)
   const formattedUsdValueStaked = cakePriceBusd.gt(0) && stakeAmount ? formatNumber(usdValueStaked.toNumber()) : ''
@@ -116,19 +112,21 @@ const VaultStakeModal: React.FC<React.PropsWithChildren<VaultStakeModalProps>> =
   }, [allowance, stakeAmount, isRemovingStake])
 
   const callOptions = {
-    gas: vaultPoolConfig[pool.vaultKey].gasLimit,
+    gas: pool.vaultKey ? vaultPoolConfig[pool.vaultKey].gasLimit : undefined,
   }
 
   const interestBreakdown = getInterestBreakdown({
     principalInUSD: !usdValueStaked.isNaN() ? usdValueStaked.toNumber() : 0,
-    apr: +flexibleApy,
-    earningTokenPrice,
+    apr: flexibleApy !== undefined ? +flexibleApy : 0,
+    earningTokenPrice: earningTokenPrice || 0,
     performanceFee,
     compoundFrequency: 0,
   })
 
-  const annualRoi = interestBreakdown[3] * pool.earningTokenPrice
-  const formattedAnnualRoi = formatNumber(annualRoi, annualRoi > 10000 ? 0 : 2, annualRoi > 10000 ? 0 : 2)
+  const annualRoi = pool.earningTokenPrice ? interestBreakdown[3] * pool.earningTokenPrice : undefined
+  const formattedAnnualRoi = annualRoi
+    ? formatNumber(annualRoi, annualRoi > 10000 ? 0 : 2, annualRoi > 10000 ? 0 : 2)
+    : undefined
 
   const getTokenLink = stakingToken.address ? `/swap?outputCurrency=${stakingToken.address}` : '/swap'
   const convertedStakeAmount = getDecimalAmount(new BigNumber(stakeAmount), stakingToken.decimals)
@@ -174,7 +172,7 @@ const VaultStakeModal: React.FC<React.PropsWithChildren<VaultStakeModalProps>> =
       }
 
       if (pool.vaultKey === VaultKey.CakeFlexibleSideVault) {
-        const { sharesAsBigNumber } = convertCakeToShares(convertedStakeAmount, pricePerFullShare)
+        const { sharesAsBigNumber } = convertCakeToShares(convertedStakeAmount, pricePerFullShare || BIG_ZERO)
         return callWithGasPrice(vaultPoolContract, 'withdraw', [parseInt(sharesAsBigNumber.toString())], callOptions)
       }
 
@@ -189,8 +187,12 @@ const VaultStakeModal: React.FC<React.PropsWithChildren<VaultStakeModalProps>> =
         </ToastDescriptionWithTx>,
       )
       onDismiss?.()
-      dispatch(fetchCakeVaultUserData({ account, chainId }))
+      if (account && chainId) {
+        dispatch(fetchCakeVaultUserData({ account, chainId }))
+      }
     }
+
+    logGTMClickUnstakePoolEvent(stakingToken.symbol)
   }
 
   const handleDeposit = async (lockDuration = 0) => {
@@ -210,8 +212,12 @@ const VaultStakeModal: React.FC<React.PropsWithChildren<VaultStakeModalProps>> =
         </ToastDescriptionWithTx>,
       )
       onDismiss?.()
-      dispatch(fetchCakeVaultUserData({ account, chainId }))
+      if (account && chainId) {
+        dispatch(fetchCakeVaultUserData({ account, chainId }))
+      }
     }
+
+    logGTMClickStakePoolEvent(stakingToken.symbol)
   }
 
   const handleConfirmClick = async () => {
@@ -230,7 +236,7 @@ const VaultStakeModal: React.FC<React.PropsWithChildren<VaultStakeModalProps>> =
         pool={pool}
         linkLabel={t('Get %symbol%', { symbol: stakingToken.symbol })}
         linkHref={getTokenLink}
-        stakingTokenBalance={cakeAsBigNumber.plus(stakingMax)}
+        stakingTokenBalance={cakeAsBigNumber?.plus(stakingMax)}
         onBack={() => setShowRoiCalculator(false)}
         initialValue={stakeAmount}
         performanceFee={performanceFee}
@@ -291,7 +297,7 @@ const VaultStakeModal: React.FC<React.PropsWithChildren<VaultStakeModalProps>> =
           {t('Max')}
         </StyledButton>
       </Flex>
-      {isRemovingStake && hasUnstakingFee && (
+      {isRemovingStake && hasUnstakingFee && vaultKey && (
         <FeeSummary vaultKey={vaultKey} stakingTokenSymbol={stakingToken.symbol} stakeAmount={stakeAmount} />
       )}
       {!isRemovingStake && (
@@ -316,15 +322,6 @@ const VaultStakeModal: React.FC<React.PropsWithChildren<VaultStakeModalProps>> =
           )}
         </Flex>
       )}
-      {pool.vaultKey === VaultKey.CakeVault && cakeAsNumberBalance ? (
-        <Box mt="8px" maxWidth="370px">
-          <ConvertToLock
-            stakingToken={stakingToken}
-            stakingTokenPrice={stakingTokenPrice}
-            currentStakedAmount={cakeAsNumberBalance}
-          />
-        </Box>
-      ) : null}
       {needEnable ? (
         <Button
           isLoading={cakePendingTx}

@@ -14,12 +14,13 @@ import { StableTrade } from 'config/constants/types'
 
 import { useActiveChainId } from 'hooks/useActiveChainId'
 import { useContract } from 'hooks/useContract'
+import memoize from 'lodash/memoize'
 import { Field } from '../state/swap/actions'
 
 // converts a basis points value to a sdk percent
-export function basisPointsToPercent(num: number): Percent {
+export const basisPointsToPercent = memoize((num: number): Percent => {
   return new Percent(BigInt(num), BIPS_BASE)
-}
+})
 
 export function calculateSlippageAmount(value: CurrencyAmount<Currency>, slippage: number): [bigint, bigint] {
   if (slippage < 0 || slippage > 10000) {
@@ -33,7 +34,7 @@ export function calculateSlippageAmount(value: CurrencyAmount<Currency>, slippag
 
 export function useRouterContract() {
   const { chainId } = useActiveChainId()
-  return useContract(V2_ROUTER_ADDRESS[chainId], pancakeRouter02ABI)
+  return useContract(chainId && V2_ROUTER_ADDRESS[chainId], pancakeRouter02ABI)
 }
 
 // computes price breakdown for the trade
@@ -85,7 +86,7 @@ export function computeSlippageAdjustedAmounts(
   }
 }
 
-export function warningSeverity(priceImpact: Percent | undefined): 0 | 1 | 2 | 3 | 4 {
+export function warningSeverity(priceImpact: Percent | undefined | null): 0 | 1 | 2 | 3 | 4 {
   if (!priceImpact?.lessThan(BLOCKED_PRICE_IMPACT_NON_EXPERT)) return 4
   if (!priceImpact?.lessThan(ALLOWED_PRICE_IMPACT_HIGH)) return 3
   if (!priceImpact?.lessThan(ALLOWED_PRICE_IMPACT_MEDIUM)) return 2

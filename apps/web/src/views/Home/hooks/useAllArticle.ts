@@ -1,16 +1,11 @@
-import useSWR from 'swr'
-import { ArticleType } from '../utils/transformArticle'
-import { getArticle } from './getArticle'
-
-interface AllArticleType {
-  isFetching: boolean
-  articlesData: ArticleType
-}
+import { AllArticleType, getArticle } from '@pancakeswap/blog'
+import { useQuery } from '@tanstack/react-query'
 
 export const useAllNewsArticle = (): AllArticleType => {
-  const { data: articlesData, isLoading } = useSWR(
-    ['/allNews'],
-    () =>
+  const { data: articlesData, isPending } = useQuery({
+    queryKey: ['/allNews'],
+
+    queryFn: async () =>
       getArticle({
         url: '/articles',
         urlParamsObject: {
@@ -26,16 +21,13 @@ export const useAllNewsArticle = (): AllArticleType => {
           },
         },
       }),
-    {
-      revalidateOnFocus: false,
-      revalidateIfStale: false,
-      revalidateOnReconnect: false,
-      revalidateOnMount: true,
-    },
-  )
+
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
 
   return {
-    isFetching: isLoading,
+    isFetching: isPending,
     articlesData: articlesData ?? {
       data: [],
       pagination: {
@@ -49,9 +41,10 @@ export const useAllNewsArticle = (): AllArticleType => {
 }
 
 export const useLatestArticle = (): AllArticleType => {
-  const { data: articlesData, isLoading } = useSWR(
-    ['/lastetArticle'],
-    () =>
+  const { data: articlesData, isPending } = useQuery({
+    queryKey: ['/latestArticle'],
+
+    queryFn: () =>
       getArticle({
         url: '/articles',
         urlParamsObject: {
@@ -60,16 +53,13 @@ export const useLatestArticle = (): AllArticleType => {
           pagination: { limit: 1 },
         },
       }),
-    {
-      revalidateOnFocus: false,
-      revalidateIfStale: false,
-      revalidateOnReconnect: false,
-      revalidateOnMount: true,
-    },
-  )
+
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+  })
 
   return {
-    isFetching: isLoading,
+    isFetching: isPending,
     articlesData: articlesData ?? {
       data: [],
       pagination: {

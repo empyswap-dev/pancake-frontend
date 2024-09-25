@@ -1,14 +1,20 @@
+import { ChainId } from '@pancakeswap/chains'
 import { useTheme } from '@pancakeswap/hooks'
-import { useMatchBreakpoints, DropdownMenuItems } from '@pancakeswap/uikit'
 import { useTranslation } from '@pancakeswap/localization'
+import { DropdownMenuItems, useMatchBreakpoints } from '@pancakeswap/uikit'
 import { useActiveChainId } from 'hooks/useActiveChainId'
-import { useUserNotUsCitizenAcknowledgement, IdType } from 'hooks/useUserIsUsCitizenAcknowledgement'
-import { useMemo } from 'react'
+import React, { MouseEventHandler, useMemo } from 'react'
 import { multiChainPaths } from 'state/info/constant'
-import config, { ConfigMenuItemsType } from '../config/config'
+import { logMenuClick } from 'utils/customGTMEventTracking'
+
+import config, { ConfigMenuDropDownItemsType, ConfigMenuItemsType } from '../config/config'
 import { useMenuItemsStatus } from './useMenuItemsStatus'
 
-export const useMenuItems = (onUsCitizenModalPresent?: () => void): ConfigMenuItemsType[] => {
+export type UseMenuItemsParams = {
+  onClick?: (e: React.MouseEvent<HTMLElement>, item: ConfigMenuDropDownItemsType) => void
+}
+
+export const useMenuItems = ({ onClick }: UseMenuItemsParams = {}): ConfigMenuItemsType[] => {
   const {
     t,
     currentLanguage: { code: languageCode },
@@ -23,17 +29,28 @@ export const useMenuItems = (onUsCitizenModalPresent?: () => void): ConfigMenuIt
     mobileConfig.push(mobileConfig.splice(3, 1)[0])
     return isMobile ? mobileConfig : config(t, isDark, languageCode, chainId)
   }, [t, isDark, languageCode, chainId, isMobile])
-  const [userNotUsCitizenAcknowledgement] = useUserNotUsCitizenAcknowledgement(IdType.PERPETUALS)
 
   return useMemo(() => {
     if (menuItemsStatus && Object.keys(menuItemsStatus).length) {
       return menuItems.map((item) => {
-        const innerItems = item?.items?.map((innerItem) => {
-          const itemStatus = menuItemsStatus[innerItem.href]
-          const modalId = innerItem.confirmModalId
+        const innerItems = item?.items?.map((currentItem) => {
+          const onClickEvent = (e: React.MouseEvent<HTMLButtonElement>) => {
+            if (currentItem.href) {
+              logMenuClick(currentItem.href)
+            }
+            currentItem.onClick?.(e)
+            onClick?.(e, currentItem)
+          }
+          const innerItem = {
+            ...currentItem,
+            onClick: onClickEvent,
+          }
+
+          const itemStatus = innerItem.href ? menuItemsStatus[innerItem.href] : undefined
           const isInfo = innerItem.href === '/info/v3'
+
           if (itemStatus) {
-            let itemMenuStatus = null
+            let itemMenuStatus: DropdownMenuItems['status'] | null = null
             if (itemStatus === 'soon') {
               itemMenuStatus = <DropdownMenuItems['status']>{ text: t('Soon'), color: 'warning' }
             } else if (itemStatus === 'live') {
@@ -49,29 +66,23 @@ export const useMenuItems = (onUsCitizenModalPresent?: () => void): ConfigMenuIt
             }
             return { ...innerItem, status: itemMenuStatus }
           }
-          if (modalId) {
-            let onClickEvent = null
-            if (modalId === 'usCitizenConfirmModal') {
-              onClickEvent = (e: React.MouseEvent<HTMLElement>) => {
-                if (!userNotUsCitizenAcknowledgement && onUsCitizenModalPresent) {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  onUsCitizenModalPresent()
-                }
-              }
-            }
-            return { ...innerItem, onClick: onClickEvent }
-          }
+
           if (isInfo) {
-            const href = `${innerItem.href}${multiChainPaths[chainId] ?? ''}`
+            const href = `${innerItem.href}${multiChainPaths[chainId || ChainId.BSC] ?? ''}`
             return { ...innerItem, href }
           }
 
           return innerItem
         })
-        return { ...item, items: innerItems }
+        const onItemClick: MouseEventHandler = (e) => {
+          if (item.href) {
+            logMenuClick(item.href)
+          }
+          item.onClick?.(e)
+        }
+        return { ...item, items: innerItems, onClick: onItemClick }
       })
     }
     return menuItems
-  }, [t, menuItems, menuItemsStatus, userNotUsCitizenAcknowledgement, onUsCitizenModalPresent, chainId])
+  }, [t, menuItems, menuItemsStatus, onClick, chainId])
 }

@@ -1,8 +1,8 @@
-import Path from 'path'
-import fs from 'fs'
-import { describe, it, expect } from 'vitest'
 import teams from 'config/constants/teams'
+import fs from 'fs'
+import Path from 'path'
 import { NftLocation } from 'state/nftMarket/types'
+import { describe, expect, it } from 'vitest'
 
 // FIXME: should move this test file inside localization pkg
 import { translations } from '@pancakeswap/localization'
@@ -42,6 +42,7 @@ const whitelist = [
   'Zap %amountA% %symbolA% and %amountB% %symbolB%',
   'Zap in %amount% BNB for %symbol%',
   'Zap in %amount% %symbol% for %lpSymbol%',
+  'Zap in for %lpSymbol%',
   'Order cancellation: %inputAmount% %inputTokenSymbol% for %outputAmount% %outputTokenSymbol%',
   'Order cancellation',
   'Launch App',
@@ -56,6 +57,56 @@ const whitelist = [
   'Chef’s choice',
   'Recommended Readings by Chefs',
   'Latest News about PancakeSwap and more!',
+  'Gaming Announcements',
+  'PancakeSwap Gaming Community',
+  'Gaming Community',
+  'Every Game, Every Chain, One Destination',
+  'Build',
+  'Games',
+  'with',
+  'Design Games to Captivate 1.5 Million Potential Players',
+  'Start Building',
+  'Build Games with PancakeSwap Now',
+  'Bring Your Game to Life on PancakeSwap',
+  'Your Complete Developer Infrastructure',
+  'Connect with a 1.5 Million Ready-to-Play Community',
+  'Join the community and create games with infinite possibilities',
+  'Elevate Your Games with Real Utility',
+  'Integrate CAKE tokens and NFTs to enrich the gaming experience',
+  'Build Games with the most reputable global brand in the industry',
+  'Explore Top Blockchains',
+  'PancakeSwap operates on 9 popular blockchains, welcoming developers from diverse ecosystems',
+  'Maximum Security Assurance',
+  'Ensuring maximum protection for your games',
+  'Consistent Uptime',
+  'Reliable service for your uninterrupted operations',
+  'Access Top-Tier Industry and Expertise',
+  'Guidance from the leading DEX in the industry',
+  'Most User-Friendly UX in DeFi',
+  'Elevate your user experiences to new heights',
+  'PancakeSwap Gaming Marketplace',
+  'Play, Build and Connect on PancakeSwap',
+  'Flagship',
+  'Published By',
+  'Publish Date: %date%',
+  'Publisher:',
+  'Explore Other Games',
+  'trending tags for this game:',
+  'Quick Access',
+  'NFT marketplace',
+  'Buy Squad / Bunnies',
+  'Swap Token',
+  "Your browser doesn't support iframe",
+  'The CAKE and APT Farm rewards for this pool will not be applicable to or claimable by',
+  'U.S.-based and VPN users.',
+  'The CAKE and APT Farm rewards for this pool will not be applicable to or claimable by U.S.-based and VPN users.',
+  'Base APR (APT yield only)',
+  'CAKE community.',
+  'Stake %stakedToken%, Earn APT on',
+  '%stakedToken% Syrup Pool',
+  `If more %lpLabel% LP is deposited in our Farm this week, we'll increase APT rewards for %stakedToken% Syrup Pool next week.`,
+  'Enjoying the %stakingToken% Staking APR? Get more rewards with the %lpLabel% LP on our',
+  'The rewards for this Syrup Pool will not be applicable to or claimable by',
 ]
 
 describe.concurrent('Check translations integrity', () => {
@@ -85,6 +136,7 @@ describe('Check translations available', () => {
 
   throughDirectory('src/')
   throughDirectory('../../apps/aptos')
+  throughDirectory('../../apps/bridge')
   throughDirectory('../../packages/uikit/src')
   throughDirectory('../../packages/ui-wallets/src')
   throughDirectory('../../packages/widgets-internal')

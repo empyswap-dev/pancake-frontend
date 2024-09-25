@@ -1,32 +1,33 @@
-import BigNumber from "bignumber.js";
-import { useCallback, useMemo, useState } from "react";
-import { styled } from "styled-components";
-import _toNumber from "lodash/toNumber";
 import { useTranslation } from "@pancakeswap/localization";
-import { getFullDisplayBalance, formatNumber, getDecimalAmount } from "@pancakeswap/utils/formatBalance";
-import { getInterestBreakdown } from "@pancakeswap/utils/compoundApyHelpers";
-import { BIG_ZERO } from "@pancakeswap/utils/bigNumber";
 import {
-  Modal,
-  ModalV2,
-  ModalBody,
-  ModalActions,
-  ModalInput,
-  Flex,
+  AutoRenewIcon,
   Box,
-  Text,
   Button,
+  CalculateIcon,
+  ErrorIcon,
+  Flex,
   IconButton,
   LinkExternal,
-  Skeleton,
   Message,
   MessageText,
-  AutoRenewIcon,
-  ErrorIcon,
-  CalculateIcon,
+  Modal,
+  ModalActions,
+  ModalBody,
+  ModalInput,
+  ModalV2,
   RoiCalculatorModal,
+  Skeleton,
+  Text,
+  WarningIcon,
 } from "@pancakeswap/uikit";
+import { BIG_ZERO } from "@pancakeswap/utils/bigNumber";
+import { getInterestBreakdown } from "@pancakeswap/utils/compoundApyHelpers";
+import { formatNumber, getDecimalAmount, getFullDisplayBalance } from "@pancakeswap/utils/formatBalance";
 import { trimTrailZero } from "@pancakeswap/utils/trimTrailZero";
+import BigNumber from "bignumber.js";
+import _toNumber from "lodash/toNumber";
+import { useCallback, useMemo, useState } from "react";
+import { styled } from "styled-components";
 
 const AnnualRoiContainer = styled(Flex)`
   cursor: pointer;
@@ -41,7 +42,7 @@ const AnnualRoiDisplay = styled(Text)`
 `;
 
 interface DepositModalProps {
-  account: string;
+  account?: string;
   pid: number;
   max: BigNumber;
   stakedBalance: BigNumber;
@@ -49,7 +50,9 @@ interface DepositModalProps {
   lpPrice?: BigNumber;
   lpLabel?: string;
   tokenName?: string;
+  hideTokenName?: boolean;
   apr?: number;
+  lpRewardsApr?: number;
   displayApr?: string;
   addLiquidityUrl?: string;
   cakePrice?: BigNumber;
@@ -61,10 +64,17 @@ interface DepositModalProps {
   decimals: number;
   allowance?: BigNumber;
   enablePendingTx?: boolean;
+  showTopMessageText?: null | string;
+  dualTokenRewardApr?: number;
+  farmCakePerSecond?: string;
+  totalMultipliers?: string;
+  rewardCakePerSecond?: boolean;
   onDismiss?: () => void;
   onConfirm: (amount: string) => void;
   handleApprove?: () => void;
   bCakeCalculatorSlot?: (stakingTokenBalance: string) => React.ReactNode;
+  isBooster?: boolean;
+  boosterMultiplier?: number;
 }
 
 const DepositModal: React.FC<React.PropsWithChildren<DepositModalProps>> = ({
@@ -72,6 +82,7 @@ const DepositModal: React.FC<React.PropsWithChildren<DepositModalProps>> = ({
   max,
   stakedBalance,
   tokenName = "",
+  hideTokenName,
   multiplier,
   displayApr,
   lpPrice = BIG_ZERO,
@@ -86,10 +97,18 @@ const DepositModal: React.FC<React.PropsWithChildren<DepositModalProps>> = ({
   decimals,
   allowance,
   enablePendingTx,
+  showTopMessageText,
+  dualTokenRewardApr,
+  farmCakePerSecond,
+  totalMultipliers,
+  rewardCakePerSecond,
+  lpRewardsApr,
   onConfirm,
   onDismiss,
   handleApprove,
   bCakeCalculatorSlot,
+  isBooster,
+  boosterMultiplier,
 }) => {
   const [val, setVal] = useState("");
   const [valUSDPrice, setValUSDPrice] = useState(BIG_ZERO);
@@ -173,12 +192,19 @@ const DepositModal: React.FC<React.PropsWithChildren<DepositModalProps>> = ({
           stakingTokenSymbol={tokenName}
           stakingTokenPrice={lpPrice.toNumber()}
           earningTokenPrice={cakePrice.toNumber()}
-          apr={bCakeMultiplier ? apr * bCakeMultiplier : apr}
+          apr={isBooster ? apr * (boosterMultiplier ?? 1) : apr}
           multiplier={multiplier}
-          displayApr={bCakeMultiplier ? (_toNumber(displayApr) - apr + apr * bCakeMultiplier).toFixed(2) : displayApr}
+          displayApr={
+            isBooster ? (_toNumber(displayApr) - apr + apr * (boosterMultiplier ?? 1)).toFixed(2) : displayApr
+          }
           linkHref={addLiquidityUrl}
           isFarm
           initialValue={val}
+          dualTokenRewardApr={dualTokenRewardApr}
+          farmCakePerSecond={farmCakePerSecond}
+          totalMultipliers={totalMultipliers}
+          rewardCakePerSecond={rewardCakePerSecond}
+          lpRewardsApr={lpRewardsApr}
           onBack={() => setShowRoiCalculator(false)}
           bCakeCalculatorSlot={bCakeCalculatorSlot}
         />
@@ -189,6 +215,13 @@ const DepositModal: React.FC<React.PropsWithChildren<DepositModalProps>> = ({
   return (
     <Modal title={t("Stake LP tokens")} onDismiss={onDismiss}>
       <ModalBody width={["100%", "100%", "100%", "420px"]}>
+        {showTopMessageText && (
+          <Box mb="15px">
+            <Message variant="danger" icon={<WarningIcon width="24px" color="failure" />}>
+              <MessageText>{showTopMessageText}</MessageText>
+            </Message>
+          </Box>
+        )}
         <ModalInput
           value={val}
           valueUSDPrice={valUSDPrice}
@@ -269,9 +302,11 @@ const DepositModal: React.FC<React.PropsWithChildren<DepositModalProps>> = ({
             </Button>
           )}
         </ModalActions>
-        <LinkExternal href={addLiquidityUrl} style={{ alignSelf: "center" }}>
-          {t("Add %symbol%", { symbol: tokenName })}
-        </LinkExternal>
+        {hideTokenName ? null : (
+          <LinkExternal href={addLiquidityUrl} style={{ alignSelf: "center" }}>
+            {t("Add %symbol%", { symbol: tokenName })}
+          </LinkExternal>
+        )}
       </ModalBody>
     </Modal>
   );

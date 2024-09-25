@@ -72,11 +72,15 @@ export const useTweetsData = () => {
   return useMemo(() => {
     return [
       {
-        tweet: `🎂 3 years ago, we planted the seed on the BNB Chain, and today, it has grown into Everyone's Favorite DEX across eight blockchains.`,
-        link: 'https://x.com/PancakeSwap/status/1705190230394032541?s=20',
-        date: 'Sep 22',
-        like: '249',
-        impression: '19.7k',
+        tweet: `Get Your Uniswap Interface Fees Refunded on PancakeSwap, up to $8M!
+
+Match your Ethereum Uniswap volume 1:1 on Ethereum PancakeSwap, and we’ll refund ALL your interface fees paid.
+Trade now: https://pancakeswap.finance/swap?chain=eth&utm_source=twitter&utm_medium=Ethereum&utm_campaign=Swap&utm_id=InterfacefeeRefund
+`,
+        link: 'https://x.com/PancakeSwap/status/1791076335462314097',
+        date: 'May 16',
+        like: '1k',
+        impression: '295.5k',
       },
     ]
   }, [])
